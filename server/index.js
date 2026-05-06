@@ -19,6 +19,7 @@ const port = Number(process.env.PORT || 3001);
 const adminUsername = "admin";
 const adminPassword = "555837";
 const adminSecret = process.env.ADMIN_SECRET || "chaika-admin-local-secret";
+const sketchupApiKey = process.env.SKETCHUP_API_KEY || adminSecret;
 
 const defaultModelSettings = {
   cameraAngle: "axon",
@@ -149,6 +150,17 @@ function requireAdmin(req, res, next) {
 
   if (!verifyAdminToken(token)) {
     res.status(401).json({ error: "Admin auth required" });
+    return;
+  }
+
+  next();
+}
+
+function requireSketchUpExport(req, res, next) {
+  const apiKey = req.get("x-sketchup-api-key");
+
+  if (!apiKey || apiKey !== sketchupApiKey) {
+    res.status(401).json({ error: "SketchUp export key required" });
     return;
   }
 
@@ -345,6 +357,52 @@ app.post(
     res.json(product);
   }
 );
+
+app.get("/api/sketchup/products", requireSketchUpExport, async (_req, res) => {
+  const content = await readContent();
+  res.json(content.products.map(({ id, title }) => ({ id, title })));
+});
+
+app.post("/api/sketchup/model/upload", requireSketchUpExport, upload.single("model"), async (req, res) => {
+  const content = await readContent();
+  const file = req.file;
+
+  if (!file) {
+    res.status(400).json({ error: "GLB or GLTF file required" });
+    return;
+  }
+
+  const activeFile = {
+    name: file.originalname,
+    size: file.size,
+    url: `/uploads/models/${file.filename}`,
+    uploadedAt: new Date().toISOString()
+  };
+
+  content.model.activeFile = activeFile;
+  await writeContent(content);
+  res.status(201).json(content.model);
+});
+
+app.post("/api/sketchup/products/:id/upload", requireSketchUpExport, upload.single("model"), async (req, res) => {
+  const content = await readContent();
+  const product = content.products.find((item) => item.id === req.params.id);
+  const file = req.file;
+
+  if (!product) {
+    res.status(404).json({ error: "Product not found" });
+    return;
+  }
+
+  if (!file) {
+    res.status(400).json({ error: "GLB or GLTF file required" });
+    return;
+  }
+
+  product.modelUrl = `/uploads/models/${file.filename}`;
+  await writeContent(content);
+  res.status(201).json(product);
+});
 
 app.post("/api/blog", requireAdmin, async (req, res) => {
   const content = await readContent();
