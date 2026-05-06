@@ -242,6 +242,10 @@ export async function clearModel() {
   });
 }
 
+export async function createClientLink(payload) {
+  return request("/api/client-links", jsonOptions("POST", payload));
+}
+
 export async function uploadProductAssets(productId, files) {
   const body = new FormData();
 

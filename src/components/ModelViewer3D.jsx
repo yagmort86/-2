@@ -131,12 +131,21 @@ function normalizeObject(object) {
 function frameObject(object, camera, controls, cameraAngle) {
   normalizeObject(object);
 
+  const box = new THREE.Box3().setFromObject(object);
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
   const cameraPosition = new THREE.Vector3(...(cameraPositions[cameraAngle] ?? cameraPositions.axon));
   camera.fov = 42;
-  camera.position.copy(cameraPosition);
-  camera.lookAt(0, 0, 0);
+  const verticalFov = THREE.MathUtils.degToRad(camera.fov);
+  const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * Math.max(camera.aspect, 0.1));
+  const padding = camera.aspect < 0.8 ? 2.7 : 1.32;
+  const distance = Math.max(
+    sphere.radius / Math.sin(verticalFov / 2),
+    sphere.radius / Math.sin(horizontalFov / 2)
+  ) * padding;
+  camera.position.copy(cameraPosition.normalize().multiplyScalar(distance));
+  camera.lookAt(sphere.center);
   camera.updateProjectionMatrix();
-  controls.target.set(0, 0, 0);
+  controls.target.copy(sphere.center);
   controls.update();
 }
 
@@ -189,7 +198,7 @@ export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, cla
     controls.autoRotate = viewerSettings.autoRotate !== false && !reduceMotion;
     controls.autoRotateSpeed = 0.55;
     controls.minDistance = 2.8;
-    controls.maxDistance = 12;
+    controls.maxDistance = 80;
     controlsRef.current = controls;
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0xd8c8b8, 1.35));
@@ -233,7 +242,20 @@ export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, cla
       activeObjectRef.current = activeObject;
       applyRenderSettings(activeObject, viewerSettingsRef.current);
       scene.add(activeObject);
+      const width = mount.clientWidth || 1;
+      const height = mount.clientHeight || 1;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height, false);
       frameObject(activeObject, camera, controls, viewerSettingsRef.current.cameraAngle);
+      window.requestAnimationFrame(() => {
+        const nextWidth = mount.clientWidth || 1;
+        const nextHeight = mount.clientHeight || 1;
+        camera.aspect = nextWidth / nextHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(nextWidth, nextHeight, false);
+        frameObject(activeObject, camera, controls, viewerSettingsRef.current.cameraAngle);
+      });
     }
 
     const loader = new GLTFLoader();
@@ -257,6 +279,9 @@ export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, cla
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
         renderer.setSize(width, height, false);
+        if (activeObject) {
+          frameObject(activeObject, camera, controls, viewerSettingsRef.current.cameraAngle);
+        }
       });
     }
 

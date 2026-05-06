@@ -22,7 +22,7 @@ import {
   Typography
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router";
-import { clearModel, getModel, updateModel, uploadModel, uploadProductAssets } from "./providers";
+import { clearModel, createClientLink, getModel, updateModel, uploadModel, uploadProductAssets } from "./providers";
 
 const resourceTitles = {
   products: "Товары",
@@ -561,6 +561,8 @@ export function LoginPage() {
 export function ModelPage() {
   const [model, setModel] = useState(null);
   const [status, setStatus] = useState("");
+  const [clientTitle, setClientTitle] = useState("");
+  const [clientLink, setClientLink] = useState(null);
 
   useEffect(() => {
     getModel().then(setModel).catch(() => setStatus("Не удалось загрузить модель."));
@@ -607,6 +609,24 @@ export function ModelPage() {
     }
   }
 
+  async function createLink() {
+    if (!model.activeFile?.url) {
+      setStatus("Сначала загрузите GLB/GLTF модель.");
+      return;
+    }
+
+    try {
+      const link = await createClientLink({
+        title: clientTitle || model.activeFile.name,
+        modelUrl: model.activeFile.url
+      });
+      setClientLink(`${window.location.origin}${link.publicPath}`);
+      setStatus("Ссылка для клиента создана.");
+    } catch {
+      setStatus("Не удалось создать клиентскую ссылку.");
+    }
+  }
+
   if (!model) {
     return <Typography>Загрузка...</Typography>;
   }
@@ -615,7 +635,7 @@ export function ModelPage() {
     <Paper className="admin-form-panel" variant="outlined">
       <Stack spacing={2.5}>
         <Typography variant="h5">3D-модель на главном блоке</Typography>
-        {status ? <Alert severity={status.includes("Не удалось") ? "error" : "success"}>{status}</Alert> : null}
+        {status ? <Alert severity={status.includes("Не удалось") || status.includes("Сначала") ? "error" : "success"}>{status}</Alert> : null}
         <Box className="admin-model-file">
           <Typography variant="caption">Активный файл</Typography>
           <Typography>{model.activeFile?.name || "Не загружен"}</Typography>
@@ -629,6 +649,26 @@ export function ModelPage() {
           <Button variant="outlined" color="error" onClick={clear}>
             Удалить
           </Button>
+        </Stack>
+        <Stack spacing={1.5}>
+          <Typography variant="subtitle1">Ссылка клиенту</Typography>
+          <TextField
+            label="Название проекта"
+            value={clientTitle}
+            onChange={(event) => setClientTitle(event.target.value)}
+            placeholder={model.activeFile?.name || "Лестница клиента"}
+          />
+          <Stack direction="row" spacing={1.5}>
+            <Button variant="outlined" onClick={createLink}>
+              Создать ссылку выбора
+            </Button>
+            {clientLink ? (
+              <Button variant="text" onClick={() => navigator.clipboard?.writeText(clientLink)}>
+                Скопировать
+              </Button>
+            ) : null}
+          </Stack>
+          {clientLink ? <Typography variant="body2">{clientLink}</Typography> : null}
         </Stack>
         <Stack spacing={1}>
           <Typography variant="subtitle1">Ракурс</Typography>

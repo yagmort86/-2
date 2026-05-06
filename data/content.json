@@ -218,15 +218,38 @@
   ],
   "model": {
     "activeFile": {
-      "name": "ÐÐ¾Ð¼Ð¿Ð¾Ð½ÐµÐ½Ñ_186_1.glb",
+      "name": "Компонент_186_1.glb",
       "size": 2593868,
-      "url": "/uploads/models/a66edf5e-a53d-49d6-9152-cb11a44ce78c.glb",
-      "uploadedAt": "2026-05-06T18:28:58.466Z"
+      "url": "/uploads/models/6a7e45f7-c6ef-4538-a894-3fe36ffcaf1b.glb",
+      "uploadedAt": "2026-05-06T20:43:52.502Z"
     },
     "settings": {
       "cameraAngle": "axon",
       "showLines": true,
-      "shadows": false
+      "shadows": true
     }
-  }
+  },
+  "clientLinks": [
+    {
+      "token": "WNSd_acWe3E",
+      "title": "Компонент_186_1.glb",
+      "modelUrl": "/uploads/models/6a7e45f7-c6ef-4538-a894-3fe36ffcaf1b.glb",
+      "productId": null,
+      "createdAt": "2026-05-06T20:43:59.952Z"
+    },
+    {
+      "token": "upfM_sGicVc",
+      "title": "Компонент_186_1.glb",
+      "modelUrl": "/uploads/models/45e90e57-30c6-4887-808a-98c777007cba.glb",
+      "productId": null,
+      "createdAt": "2026-05-06T20:14:06.186Z"
+    },
+    {
+      "token": "7HiHptfETUE",
+      "title": "chaika-export-1778093936.glb",
+      "modelUrl": "/uploads/models/2740720c-2e49-4cef-ba57-9e85225467ed.glb",
+      "productId": null,
+      "createdAt": "2026-05-06T20:11:01.791Z"
+    }
+  ]
 }

@@ -3,9 +3,17 @@ import { createRoot } from "react-dom/client";
 
 const AdminApp = lazy(() => import("./admin/AdminApp.jsx"));
 const LandingApp = lazy(() => import("./App.jsx"));
+const ClientModelApp = lazy(() => import("./ClientModelApp.jsx"));
 
 function RootApp() {
-  const App = window.location.pathname.startsWith("/admin") ? AdminApp : LandingApp;
+  const path = window.location.pathname;
+  let App = LandingApp;
+
+  if (path.startsWith("/admin")) {
+    App = AdminApp;
+  } else if (path.startsWith("/client/") || path.startsWith("/viewer/") || path.startsWith("/tg") || path.startsWith("/telegram")) {
+    App = ClientModelApp;
+  }
 
   return (
     <Suspense fallback={<div />}>

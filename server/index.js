@@ -20,6 +20,7 @@ const adminUsername = "admin";
 const adminPassword = "555837";
 const adminSecret = process.env.ADMIN_SECRET || "chaika-admin-local-secret";
 const sketchupApiKey = process.env.SKETCHUP_API_KEY || adminSecret;
+const telegramBotUsername = process.env.TELEGRAM_BOT_USERNAME || "YourBot";
 
 const defaultModelSettings = {
   cameraAngle: "axon",
@@ -61,7 +62,8 @@ const defaultContent = {
   model: {
     activeFile: null,
     settings: defaultModelSettings
-  }
+  },
+  clientLinks: []
 };
 
 async function ensureStorage() {
@@ -88,7 +90,8 @@ async function readContent() {
         ...defaultModelSettings,
         ...content.model?.settings
       }
-    }
+    },
+    clientLinks: Array.isArray(content.clientLinks) ? content.clientLinks : []
   };
 }
 
@@ -205,6 +208,15 @@ function normalizeProduct(body, existing = {}) {
     specs: normalizeSpecs(body.specs || existing.specs),
     details: normalizeStringArray(body.details || existing.details),
     photos: normalizeStringArray(body.photos || existing.photos)
+  };
+}
+
+function createClientLinkResponse(link) {
+  return {
+    ...link,
+    publicPath: `/client/${link.token}`,
+    browserPath: `/viewer/${link.token}`,
+    telegramUrl: `https://t.me/${telegramBotUsername}?startapp=${encodeURIComponent(link.token)}`
   };
 }
 
@@ -648,6 +660,53 @@ app.delete("/api/model", requireAdmin, async (_req, res) => {
   content.model.activeFile = null;
   await writeContent(content);
   res.json(content.model);
+});
+
+app.get("/api/client-links", requireAdmin, async (_req, res) => {
+  const content = await readContent();
+  res.json(content.clientLinks.map(createClientLinkResponse));
+});
+
+app.post("/api/client-links", requireAdmin, async (req, res) => {
+  const content = await readContent();
+  const product = req.body.productId
+    ? content.products.find((item) => item.id === req.body.productId)
+    : null;
+  const modelUrl = String(req.body.modelUrl || product?.modelUrl || content.model.activeFile?.url || "").trim();
+
+  if (!modelUrl) {
+    res.status(400).json({ error: "Model URL required" });
+    return;
+  }
+
+  let token = String(req.body.token || crypto.randomBytes(8).toString("base64url")).replace(/[^a-zA-Z0-9_-]/g, "");
+  while (!token || content.clientLinks.some((link) => link.token === token)) {
+    token = crypto.randomBytes(8).toString("base64url");
+  }
+
+  const link = {
+    token,
+    title: String(req.body.title || product?.title || content.model.activeFile?.name || "Лестница").trim(),
+    modelUrl,
+    productId: product?.id || null,
+    createdAt: new Date().toISOString()
+  };
+
+  content.clientLinks.unshift(link);
+  await writeContent(content);
+  res.status(201).json(createClientLinkResponse(link));
+});
+
+app.get("/api/client-links/:token", async (req, res) => {
+  const content = await readContent();
+  const link = content.clientLinks.find((item) => item.token === req.params.token);
+
+  if (!link) {
+    res.status(404).json({ error: "Client link not found" });
+    return;
+  }
+
+  res.json(createClientLinkResponse(link));
 });
 
 if (existsSync(distPath)) {
