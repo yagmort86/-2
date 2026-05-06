@@ -1,0 +1,36 @@
+{
+  "name": "stair-frame-landing",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "dev:api": "node --watch server/index.js",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "start": "node server/index.js"
+  },
+  "dependencies": {
+    "@emotion/react": "latest",
+    "@emotion/styled": "latest",
+    "@gsap/react": "latest",
+    "@mui/icons-material": "^6.5.0",
+    "@mui/material": "^6.5.0",
+    "@mui/x-data-grid": "^8.28.2",
+    "@refinedev/core": "^5.0.12",
+    "@refinedev/mui": "^8.0.2",
+    "@refinedev/react-router": "^2.0.4",
+    "express": "^5.2.1",
+    "gsap": "latest",
+    "lucide-react": "latest",
+    "multer": "^2.1.1",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-router": "^7.15.0",
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest"
+  }
+}

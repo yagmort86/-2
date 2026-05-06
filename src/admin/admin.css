@@ -1,0 +1,130 @@
+#root {
+  min-height: 100vh;
+}
+
+.admin-topbar {
+  min-height: 72px;
+  padding: 12px 24px;
+  border-bottom: 1px solid #3f403d;
+  background: #151515;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-title {
+  min-height: 56px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ebe9df;
+}
+
+.admin-title-mark {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #a56b43;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  color: #d7b08a;
+  font-weight: 700;
+}
+
+.admin-title-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.admin-form {
+  padding: 24px;
+}
+
+.admin-form-panel,
+.admin-show-panel,
+.admin-upload-panel,
+.admin-login-card {
+  border-radius: 8px;
+  background: #20201f;
+}
+
+.admin-form-panel,
+.admin-show-panel {
+  width: min(100%, 920px);
+  padding: 24px;
+}
+
+.admin-upload-panel {
+  width: min(100%, 320px);
+  padding: 20px;
+}
+
+.admin-login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    linear-gradient(135deg, rgba(165, 107, 67, 0.18), transparent 36%),
+    #151515;
+}
+
+.admin-login-card {
+  width: min(100%, 420px);
+  padding: 28px;
+}
+
+.admin-thumb {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #3f403d;
+  background: #151515;
+}
+
+.admin-muted {
+  color: #94958e;
+}
+
+.admin-show-row {
+  padding: 12px 0;
+  border-bottom: 1px solid #3f403d;
+}
+
+.admin-show-row pre {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: inherit;
+}
+
+.admin-model-file {
+  padding: 16px;
+  border: 1px solid #3f403d;
+  border-radius: 8px;
+  background: #151515;
+}
+
+.MuiDataGrid-root {
+  background: #20201f;
+  border-color: #3f403d;
+}
+
+@media (max-width: 700px) {
+  .admin-topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-form {
+    padding: 16px;
+  }
+
+  .admin-form-panel,
+  .admin-show-panel {
+    padding: 18px;
+  }
+}
