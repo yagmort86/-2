@@ -6,21 +6,11 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 const defaultSettings = {
   cameraAngle: "axon",
   showLines: false,
-  lineColor: "black",
-  lens: "default",
-  frameColor: "",
-  stepColor: "",
-  materialRoles: {},
-  exposure: 1,
+  lineColor: "dark",
+  softShadows: false,
   shadows: true,
   background: "transparent",
   autoRotate: true
-};
-
-const lensSettings = {
-  default: { fov: 42, distance: 1 },
-  tele: { fov: 24, distance: 1.72 },
-  wide: { fov: 62, distance: 0.84 }
 };
 
 const cameraPositions = {
@@ -67,158 +57,7 @@ function makeFallbackStair() {
 }
 
 function getLineColor(color) {
-  return color === "white" ? 0xffffff : 0x111111;
-}
-
-function getMaterialList(material) {
-  return Array.isArray(material) ? material : [material].filter(Boolean);
-}
-
-function getMaterialKey(material) {
-  return material?.name?.trim() || material?.uuid || "material";
-}
-
-function getMeshText(node) {
-  return [
-    node.name,
-    ...getMaterialList(node.material).map((material) => material?.name)
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-}
-
-function classifyMesh(node) {
-  const text = getMeshText(node);
-  const stepWords = ["step", "stair", "tread", "wood", "timber", "oak", "ash", "дерев", "ступ", "ясень", "дуб"];
-  const frameWords = ["frame", "metal", "steel", "rail", "stringer", "support", "mm", "мм", "каркас", "косоур", "перил", "стойк", "опор"];
-
-  if (stepWords.some((word) => text.includes(word))) {
-    return "step";
-  }
-
-  if (frameWords.some((word) => text.includes(word))) {
-    return "frame";
-  }
-
-  const material = getMaterialList(node.material).find((item) => item?.color);
-  if (material?.color) {
-    const hsl = {};
-    material.color.getHSL(hsl);
-    return hsl.s > 0.16 && hsl.l > 0.35 ? "step" : "frame";
-  }
-
-  return "frame";
-}
-
-function getRoleFromMaterials(node, materialRoles) {
-  const roles = getMaterialList(node.material)
-    .map((material) => materialRoles[getMaterialKey(material)])
-    .filter(Boolean);
-
-  if (roles.includes("step")) {
-    return "step";
-  }
-
-  if (roles.includes("frame")) {
-    return "frame";
-  }
-
-  if (roles.includes("ignore")) {
-    return "ignore";
-  }
-
-  return "";
-}
-
-function getMaterialColor(material) {
-  return material?.color ? `#${material.color.getHexString()}` : "#ffffff";
-}
-
-function collectModelMaterials(object) {
-  const materials = new Map();
-
-  object.traverse((node) => {
-    if (!node.isMesh) {
-      return;
-    }
-
-    getMaterialList(node.material).forEach((material) => {
-      const key = getMaterialKey(material);
-
-      if (!materials.has(key)) {
-        materials.set(key, {
-          key,
-          name: material?.name?.trim() || "Материал",
-          color: getMaterialColor(material),
-          role: classifyMesh({ ...node, material })
-        });
-      }
-    });
-  });
-
-  return Array.from(materials.values());
-}
-
-function applyMaterialColor(node, color) {
-  if (!/^#[0-9a-f]{6}$/i.test(color)) {
-    return;
-  }
-
-  const targetColor = new THREE.Color(color);
-  if (!node.userData.chaikaOwnMaterial) {
-    const isArray = Array.isArray(node.material);
-    const nextMaterials = getMaterialList(node.material).map((material) => {
-      if (!material?.color) {
-        return material;
-      }
-
-      return material.clone();
-    });
-
-    node.material = isArray ? nextMaterials : nextMaterials[0];
-    node.userData.chaikaOwnMaterial = true;
-  }
-
-  getMaterialList(node.material).forEach((material) => {
-    if (!material?.color) {
-      return;
-    }
-
-    material.userData.chaikaOriginalColor ||= material.color.clone();
-    material.color.copy(targetColor);
-    material.needsUpdate = true;
-  });
-}
-
-function restoreMaterialColor(node) {
-  getMaterialList(node.material).forEach((material) => {
-    if (!material?.color || !material.userData.chaikaOriginalColor) {
-      return;
-    }
-
-    material.color.copy(material.userData.chaikaOriginalColor);
-    material.needsUpdate = true;
-  });
-}
-
-function applyMaterialSettings(object, settings) {
-  const materialRoles = settings.materialRoles || {};
-
-  object.traverse((node) => {
-    if (!node.isMesh || !node.material) {
-      return;
-    }
-
-    const role = getRoleFromMaterials(node, materialRoles) || classifyMesh(node);
-
-    if (role === "ignore") {
-      restoreMaterialColor(node);
-      return;
-    }
-
-    applyMaterialColor(node, role === "step" ? settings.stepColor : settings.frameColor);
-  });
+  return color === "white" ? 0xffffff : 0x2f343a;
 }
 
 function removeModelLines(object) {
@@ -260,8 +99,6 @@ function addModelLines(object, color) {
 }
 
 function applyRenderSettings(object, settings) {
-  applyMaterialSettings(object, settings);
-
   object.traverse((node) => {
     if (node.isMesh) {
       node.castShadow = settings.shadows;
@@ -291,13 +128,12 @@ function normalizeObject(object) {
   object.userData.chaikaFramed = true;
 }
 
-function frameObject(object, camera, controls, cameraAngle, lens) {
+function frameObject(object, camera, controls, cameraAngle) {
   normalizeObject(object);
 
-  const lensSetting = lensSettings[lens] ?? lensSettings.default;
   const cameraPosition = new THREE.Vector3(...(cameraPositions[cameraAngle] ?? cameraPositions.axon));
-  camera.fov = lensSetting.fov;
-  camera.position.copy(cameraPosition.multiplyScalar(lensSetting.distance));
+  camera.fov = 42;
+  camera.position.copy(cameraPosition);
   camera.lookAt(0, 0, 0);
   camera.updateProjectionMatrix();
   controls.target.set(0, 0, 0);
@@ -305,14 +141,6 @@ function frameObject(object, camera, controls, cameraAngle, lens) {
 }
 
 function getBackgroundColor(background) {
-  if (background === "dark") {
-    return new THREE.Color(0x101722);
-  }
-
-  if (background === "blueprint") {
-    return new THREE.Color(0xddebf7);
-  }
-
   if (background === "white") {
     return new THREE.Color(0xffffff);
   }
@@ -320,18 +148,16 @@ function getBackgroundColor(background) {
   return null;
 }
 
-export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, className = "", onMaterialsChange }) {
+export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, className = "" }) {
   const mountRef = useRef(null);
   const activeObjectRef = useRef(null);
   const cameraRef = useRef(null);
   const controlsRef = useRef(null);
   const rendererRef = useRef(null);
-  const onMaterialsChangeRef = useRef(onMaterialsChange);
   const viewerSettingsRef = useRef(defaultSettings);
   const viewerSettings = { ...defaultSettings, ...settings };
 
   viewerSettingsRef.current = viewerSettings;
-  onMaterialsChangeRef.current = onMaterialsChange;
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -345,7 +171,7 @@ export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, cla
     scene.background = backgroundColor;
     scene.fog = new THREE.FogExp2(0xf3eee6, 0.055);
 
-    const camera = new THREE.PerspectiveCamera((lensSettings[viewerSettings.lens] ?? lensSettings.default).fov, 1, 0.1, 100);
+    const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
     cameraRef.current = camera;
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     rendererRef.current = renderer;
@@ -353,9 +179,9 @@ export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, cla
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = viewerSettings.exposure;
+    renderer.toneMappingExposure = 1;
     renderer.shadowMap.enabled = viewerSettings.shadows;
-    renderer.shadowMap.type = THREE.PCFShadowMap;
+    renderer.shadowMap.type = viewerSettings.softShadows ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
     mount.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -378,6 +204,7 @@ export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, cla
     mainLight.shadow.camera.right = 6;
     mainLight.shadow.camera.top = 6;
     mainLight.shadow.camera.bottom = -6;
+    mainLight.shadow.radius = viewerSettings.softShadows ? 5 : 1;
     scene.add(mainLight);
 
     const sideLight = new THREE.DirectionalLight(0xd9ecff, 1.35);
@@ -391,7 +218,7 @@ export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, cla
     if (viewerSettings.shadows) {
       const shadowPlane = new THREE.Mesh(
         new THREE.PlaneGeometry(14, 14),
-        new THREE.ShadowMaterial({ color: 0x3f3024, opacity: 0.14 })
+        new THREE.ShadowMaterial({ color: 0x3f3024, opacity: viewerSettings.softShadows ? 0.1 : 0.14 })
       );
       shadowPlane.rotation.x = -Math.PI / 2;
       shadowPlane.position.y = -1.28;
@@ -405,9 +232,8 @@ export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, cla
       activeObject = object;
       activeObjectRef.current = activeObject;
       applyRenderSettings(activeObject, viewerSettingsRef.current);
-      onMaterialsChangeRef.current?.(collectModelMaterials(activeObject));
       scene.add(activeObject);
-      frameObject(activeObject, camera, controls, viewerSettingsRef.current.cameraAngle, viewerSettingsRef.current.lens);
+      frameObject(activeObject, camera, controls, viewerSettingsRef.current.cameraAngle);
     }
 
     const loader = new GLTFLoader();
@@ -471,7 +297,7 @@ export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, cla
         });
       }
     };
-  }, [modelUrl, viewerSettings.shadows, viewerSettings.background, viewerSettings.autoRotate]);
+  }, [modelUrl, viewerSettings.shadows, viewerSettings.softShadows, viewerSettings.background, viewerSettings.autoRotate]);
 
   useEffect(() => {
     const activeObject = activeObjectRef.current;
@@ -483,21 +309,12 @@ export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, cla
       return;
     }
 
-    if (renderer) {
-      renderer.toneMappingExposure = viewerSettings.exposure;
-    }
-
     applyRenderSettings(activeObject, viewerSettings);
-    frameObject(activeObject, camera, controls, viewerSettings.cameraAngle, viewerSettings.lens);
+    frameObject(activeObject, camera, controls, viewerSettings.cameraAngle);
   }, [
     viewerSettings.cameraAngle,
     viewerSettings.showLines,
     viewerSettings.lineColor,
-    viewerSettings.lens,
-    viewerSettings.frameColor,
-    viewerSettings.stepColor,
-    viewerSettings.materialRoles,
-    viewerSettings.exposure,
     viewerSettings.shadows
   ]);
 

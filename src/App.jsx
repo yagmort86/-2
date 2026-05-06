@@ -48,22 +48,13 @@ const defaultModelSettings = {
 
 const productModelSettings = {
   cameraAngle: "axon",
-  showLines: true,
-  lineColor: "black",
-  lens: "default",
-  frameColor: "#747b7d",
-  stepColor: "#e8d8ac",
-  exposure: 1,
-  shadows: false,
-  background: "blueprint",
+  showLines: false,
+  lineColor: "dark",
+  softShadows: true,
+  shadows: true,
+  background: "white",
   autoRotate: false
 };
-
-const reviewRoleOptions = [
-  ["frame", "Каркас"],
-  ["step", "Ступени"],
-  ["ignore", "Без цвета"]
-];
 
 const navigation = [
   { href: "#catalog", label: "Типы" },
@@ -568,12 +559,6 @@ function SketchModelSection({ modelUrl, storedModel, settings }) {
 function ReviewUploadSection() {
   const [reviewModel, setReviewModel] = useState(null);
   const [reviewSettings, setReviewSettings] = useState(productModelSettings);
-  const [reviewMaterials, setReviewMaterials] = useState([]);
-  const [reviewMaterialRoles, setReviewMaterialRoles] = useState({});
-  const viewerSettings = {
-    ...reviewSettings,
-    materialRoles: reviewMaterialRoles
-  };
 
   useEffect(() => {
     return () => {
@@ -590,9 +575,6 @@ function ReviewUploadSection() {
     if (!file) {
       return;
     }
-
-    setReviewMaterials([]);
-    setReviewMaterialRoles({});
 
     try {
       const uploaded = await uploadReviewModelFile(file);
@@ -626,21 +608,20 @@ function ReviewUploadSection() {
     setReviewSettings((current) => ({ ...current, [name]: value }));
   }
 
-  function handleReviewMaterials(materials) {
-    setReviewMaterials(materials);
-    setReviewMaterialRoles((current) => {
-      const nextRoles = {};
-
-      materials.forEach((material) => {
-        nextRoles[material.key] = current[material.key] || material.role || "frame";
-      });
-
-      return nextRoles;
-    });
+  function setOutlineMode(mode) {
+    setReviewSettings((current) => ({
+      ...current,
+      showLines: mode !== "none",
+      lineColor: mode === "white" ? "white" : "dark"
+    }));
   }
 
-  function updateMaterialRole(key, role) {
-    setReviewMaterialRoles((current) => ({ ...current, [key]: role }));
+  function getOutlineMode() {
+    if (!reviewSettings.showLines) {
+      return "none";
+    }
+
+    return reviewSettings.lineColor === "white" ? "white" : "dark";
   }
 
   return (
@@ -678,57 +659,25 @@ function ReviewUploadSection() {
                   <ModelViewer3D
                     modelUrl={reviewModel.url}
                     title={decodeUploadedName(reviewModel.name)}
-                    settings={viewerSettings}
+                    settings={reviewSettings}
                     className="review-model-viewer"
-                    onMaterialsChange={handleReviewMaterials}
                   />
                 </Suspense>
               </div>
               <aside className="review-inspector" aria-label="Настройки 3D просмотра">
-                <div className="review-inspector-head">
-                  <span>VIEWER</span>
-                  <strong>Render Console</strong>
-                </div>
                 <div className="review-inspector-section">
                   <div className="review-inspector-title">Контуры</div>
-                  <label className="review-switch">
-                    <input
-                      type="checkbox"
-                      checked={reviewSettings.showLines}
-                      onChange={(event) => updateReviewSetting("showLines", event.target.checked)}
-                    />
-                    <span>{reviewSettings.showLines ? "Включены" : "Выключены"}</span>
-                  </label>
-                  <div className="review-control-group">
-                    <button
-                      type="button"
-                      aria-pressed={reviewSettings.lineColor === "black"}
-                      onClick={() => updateReviewSetting("lineColor", "black")}
-                    >
-                      Black
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={reviewSettings.lineColor === "white"}
-                      onClick={() => updateReviewSetting("lineColor", "white")}
-                    >
-                      White
-                    </button>
-                  </div>
-                </div>
-                <div className="review-inspector-section">
-                  <div className="review-inspector-title">Камера</div>
                   <div className="review-control-group review-control-stack">
                     {[
-                      ["default", "Default"],
-                      ["tele", "Tele"],
-                      ["wide", "Wide"]
+                      ["none", "Без"],
+                      ["white", "Белый"],
+                      ["dark", "Темный"]
                     ].map(([id, label]) => (
                       <button
                         key={id}
                         type="button"
-                        aria-pressed={reviewSettings.lens === id}
-                        onClick={() => updateReviewSetting("lens", id)}
+                        aria-pressed={getOutlineMode() === id}
+                        onClick={() => setOutlineMode(id)}
                       >
                         {label}
                       </button>
@@ -736,75 +685,14 @@ function ReviewUploadSection() {
                   </div>
                 </div>
                 <div className="review-inspector-section">
-                  <div className="review-inspector-title">Сцена</div>
-                  <div className="review-control-group review-control-stack">
-                    {[
-                      ["blueprint", "Studio"],
-                      ["white", "White"],
-                      ["dark", "Dark"]
-                    ].map(([id, label]) => (
-                      <button
-                        key={id}
-                        type="button"
-                        aria-pressed={reviewSettings.background === id}
-                        onClick={() => updateReviewSetting("background", id)}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  <label className="review-range-control">
-                    <span>Exposure</span>
-                    <input
-                      type="range"
-                      min="0.7"
-                      max="1.35"
-                      step="0.05"
-                      value={reviewSettings.exposure}
-                      onChange={(event) => updateReviewSetting("exposure", Number(event.target.value))}
-                    />
-                  </label>
-                </div>
-                <div className="review-inspector-section">
-                  <div className="review-inspector-title">Материалы</div>
-                  <div className="review-color-grid">
-                    <label className="review-color-control">
-                      <span>Каркас</span>
-                      <input
-                        type="color"
-                        value={reviewSettings.frameColor}
-                        onChange={(event) => updateReviewSetting("frameColor", event.target.value)}
-                      />
-                    </label>
-                    <label className="review-color-control">
-                      <span>Ступени</span>
-                      <input
-                        type="color"
-                        value={reviewSettings.stepColor}
-                        onChange={(event) => updateReviewSetting("stepColor", event.target.value)}
-                      />
-                    </label>
-                  </div>
-                  <div className="review-material-list">
-                    {reviewMaterials.map((material) => (
-                      <div className="review-material-row" key={material.key}>
-                        <span className="review-material-swatch" style={{ backgroundColor: material.color }} />
-                        <strong>{material.name}</strong>
-                        <div className="review-material-roles">
-                          {reviewRoleOptions.map(([role, label]) => (
-                            <button
-                              key={role}
-                              type="button"
-                              aria-pressed={(reviewMaterialRoles[material.key] || material.role) === role}
-                              onClick={() => updateMaterialRole(material.key, role)}
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <button
+                    className="review-shadow-button"
+                    type="button"
+                    aria-pressed={reviewSettings.shadows}
+                    onClick={() => updateReviewSetting("shadows", !reviewSettings.shadows)}
+                  >
+                    Мягкие тени
+                  </button>
                 </div>
               </aside>
             </div>
