@@ -10,6 +10,8 @@ const defaultSettings = {
   lens: "default",
   frameColor: "",
   stepColor: "",
+  materialRoles: {},
+  exposure: 1,
   shadows: true,
   background: "transparent",
   autoRotate: true
@@ -72,6 +74,10 @@ function getMaterialList(material) {
   return Array.isArray(material) ? material : [material].filter(Boolean);
 }
 
+function getMaterialKey(material) {
+  return material?.name?.trim() || material?.uuid || "material";
+}
+
 function getMeshText(node) {
   return [
     node.name,
@@ -84,8 +90,8 @@ function getMeshText(node) {
 
 function classifyMesh(node) {
   const text = getMeshText(node);
-  const stepWords = ["step", "stair", "tread", "wood", "timber", "дерев", "ступ"];
-  const frameWords = ["frame", "metal", "steel", "rail", "stringer", "support", "каркас", "косоур", "перил", "стойк", "опор"];
+  const stepWords = ["step", "stair", "tread", "wood", "timber", "oak", "ash", "дерев", "ступ", "ясень", "дуб"];
+  const frameWords = ["frame", "metal", "steel", "rail", "stringer", "support", "mm", "мм", "каркас", "косоур", "перил", "стойк", "опор"];
 
   if (stepWords.some((word) => text.includes(word))) {
     return "step";
@@ -103,6 +109,55 @@ function classifyMesh(node) {
   }
 
   return "frame";
+}
+
+function getRoleFromMaterials(node, materialRoles) {
+  const roles = getMaterialList(node.material)
+    .map((material) => materialRoles[getMaterialKey(material)])
+    .filter(Boolean);
+
+  if (roles.includes("step")) {
+    return "step";
+  }
+
+  if (roles.includes("frame")) {
+    return "frame";
+  }
+
+  if (roles.includes("ignore")) {
+    return "ignore";
+  }
+
+  return "";
+}
+
+function getMaterialColor(material) {
+  return material?.color ? `#${material.color.getHexString()}` : "#ffffff";
+}
+
+function collectModelMaterials(object) {
+  const materials = new Map();
+
+  object.traverse((node) => {
+    if (!node.isMesh) {
+      return;
+    }
+
+    getMaterialList(node.material).forEach((material) => {
+      const key = getMaterialKey(material);
+
+      if (!materials.has(key)) {
+        materials.set(key, {
+          key,
+          name: material?.name?.trim() || "Материал",
+          color: getMaterialColor(material),
+          role: classifyMesh({ ...node, material })
+        });
+      }
+    });
+  });
+
+  return Array.from(materials.values());
 }
 
 function applyMaterialColor(node, color) {
@@ -130,19 +185,39 @@ function applyMaterialColor(node, color) {
       return;
     }
 
+    material.userData.chaikaOriginalColor ||= material.color.clone();
     material.color.copy(targetColor);
     material.needsUpdate = true;
   });
 }
 
+function restoreMaterialColor(node) {
+  getMaterialList(node.material).forEach((material) => {
+    if (!material?.color || !material.userData.chaikaOriginalColor) {
+      return;
+    }
+
+    material.color.copy(material.userData.chaikaOriginalColor);
+    material.needsUpdate = true;
+  });
+}
+
 function applyMaterialSettings(object, settings) {
+  const materialRoles = settings.materialRoles || {};
+
   object.traverse((node) => {
     if (!node.isMesh || !node.material) {
       return;
     }
 
-    node.userData.chaikaPart ||= classifyMesh(node);
-    applyMaterialColor(node, node.userData.chaikaPart === "step" ? settings.stepColor : settings.frameColor);
+    const role = getRoleFromMaterials(node, materialRoles) || classifyMesh(node);
+
+    if (role === "ignore") {
+      restoreMaterialColor(node);
+      return;
+    }
+
+    applyMaterialColor(node, role === "step" ? settings.stepColor : settings.frameColor);
   });
 }
 
@@ -229,15 +304,34 @@ function frameObject(object, camera, controls, cameraAngle, lens) {
   controls.update();
 }
 
-export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, className = "" }) {
+function getBackgroundColor(background) {
+  if (background === "dark") {
+    return new THREE.Color(0x101722);
+  }
+
+  if (background === "blueprint") {
+    return new THREE.Color(0xddebf7);
+  }
+
+  if (background === "white") {
+    return new THREE.Color(0xffffff);
+  }
+
+  return null;
+}
+
+export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, className = "", onMaterialsChange }) {
   const mountRef = useRef(null);
   const activeObjectRef = useRef(null);
   const cameraRef = useRef(null);
   const controlsRef = useRef(null);
+  const rendererRef = useRef(null);
+  const onMaterialsChangeRef = useRef(onMaterialsChange);
   const viewerSettingsRef = useRef(defaultSettings);
   const viewerSettings = { ...defaultSettings, ...settings };
 
   viewerSettingsRef.current = viewerSettings;
+  onMaterialsChangeRef.current = onMaterialsChange;
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -246,17 +340,20 @@ export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, cla
     }
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const isWhiteBackground = viewerSettings.background === "white";
+    const backgroundColor = getBackgroundColor(viewerSettings.background);
     const scene = new THREE.Scene();
-    scene.background = isWhiteBackground ? new THREE.Color(0xffffff) : null;
+    scene.background = backgroundColor;
     scene.fog = new THREE.FogExp2(0xf3eee6, 0.055);
 
     const camera = new THREE.PerspectiveCamera((lensSettings[viewerSettings.lens] ?? lensSettings.default).fov, 1, 0.1, 100);
     cameraRef.current = camera;
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setClearColor(isWhiteBackground ? 0xffffff : 0x000000, isWhiteBackground ? 1 : 0);
+    rendererRef.current = renderer;
+    renderer.setClearColor(backgroundColor || 0x000000, backgroundColor ? 1 : 0);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = viewerSettings.exposure;
     renderer.shadowMap.enabled = viewerSettings.shadows;
     renderer.shadowMap.type = THREE.PCFShadowMap;
     mount.appendChild(renderer.domElement);
@@ -308,6 +405,7 @@ export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, cla
       activeObject = object;
       activeObjectRef.current = activeObject;
       applyRenderSettings(activeObject, viewerSettingsRef.current);
+      onMaterialsChangeRef.current?.(collectModelMaterials(activeObject));
       scene.add(activeObject);
       frameObject(activeObject, camera, controls, viewerSettingsRef.current.cameraAngle, viewerSettingsRef.current.lens);
     }
@@ -356,6 +454,7 @@ export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, cla
       renderer.dispose();
       cameraRef.current = null;
       controlsRef.current = null;
+      rendererRef.current = null;
       activeObjectRef.current = null;
       mount.removeChild(renderer.domElement);
       if (activeObject) {
@@ -378,9 +477,14 @@ export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, cla
     const activeObject = activeObjectRef.current;
     const camera = cameraRef.current;
     const controls = controlsRef.current;
+    const renderer = rendererRef.current;
 
     if (!activeObject || !camera || !controls) {
       return;
+    }
+
+    if (renderer) {
+      renderer.toneMappingExposure = viewerSettings.exposure;
     }
 
     applyRenderSettings(activeObject, viewerSettings);
@@ -392,6 +496,8 @@ export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, cla
     viewerSettings.lens,
     viewerSettings.frameColor,
     viewerSettings.stepColor,
+    viewerSettings.materialRoles,
+    viewerSettings.exposure,
     viewerSettings.shadows
   ]);
 
