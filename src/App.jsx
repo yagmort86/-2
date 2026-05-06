@@ -49,6 +49,10 @@ const defaultModelSettings = {
 const productModelSettings = {
   cameraAngle: "axon",
   showLines: true,
+  lineColor: "black",
+  lens: "default",
+  frameColor: "#747b7d",
+  stepColor: "#e8d8ac",
   shadows: false,
   background: "white",
   autoRotate: false
@@ -103,6 +107,22 @@ function formatFileSize(size) {
   }
 
   return `${(size / 1024 / 1024).toFixed(1)} МБ`;
+}
+
+function decodeUploadedName(name) {
+  const value = String(name || "");
+
+  if (!/[\u00c3\u00d0\u00d1]/.test(value)) {
+    return value;
+  }
+
+  try {
+    const bytes = Uint8Array.from(value, (char) => char.charCodeAt(0) & 0xff);
+    const decoded = new TextDecoder("utf-8").decode(bytes);
+    return decoded.includes("\uFFFD") ? value : decoded;
+  } catch {
+    return value;
+  }
 }
 
 function Header() {
@@ -540,6 +560,7 @@ function SketchModelSection({ modelUrl, storedModel, settings }) {
 
 function ReviewUploadSection() {
   const [reviewModel, setReviewModel] = useState(null);
+  const [reviewSettings, setReviewSettings] = useState(productModelSettings);
 
   useEffect(() => {
     return () => {
@@ -559,7 +580,7 @@ function ReviewUploadSection() {
 
     try {
       const uploaded = await uploadReviewModelFile(file);
-      setReviewModel(uploaded);
+      setReviewModel({ ...uploaded, name: decodeUploadedName(uploaded.name || file.name) });
     } catch {
       setReviewModel((current) => {
         if (current?.url?.startsWith("blob:")) {
@@ -567,7 +588,7 @@ function ReviewUploadSection() {
         }
 
         return {
-          name: file.name,
+          name: decodeUploadedName(file.name),
           size: file.size,
           url: URL.createObjectURL(file)
         };
@@ -583,6 +604,10 @@ function ReviewUploadSection() {
 
       return null;
     });
+  }
+
+  function updateReviewSetting(name, value) {
+    setReviewSettings((current) => ({ ...current, [name]: value }));
   }
 
   return (
@@ -611,11 +636,71 @@ function ReviewUploadSection() {
             </button>
             <div className="review-model-header">
               <span>Предварительное согласование</span>
-              <strong>{reviewModel.name}</strong>
+              <strong>{decodeUploadedName(reviewModel.name)}</strong>
               <em>{formatFileSize(reviewModel.size)}</em>
             </div>
+            <div className="review-model-toolbar" aria-label="Настройки 3D просмотра">
+              <label className="review-switch">
+                <input
+                  type="checkbox"
+                  checked={reviewSettings.showLines}
+                  onChange={(event) => updateReviewSetting("showLines", event.target.checked)}
+                />
+                <span>Контуры</span>
+              </label>
+              <div className="review-control-group">
+                <span>Цвет контура</span>
+                <button
+                  type="button"
+                  aria-pressed={reviewSettings.lineColor === "black"}
+                  onClick={() => updateReviewSetting("lineColor", "black")}
+                >
+                  Черный
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={reviewSettings.lineColor === "white"}
+                  onClick={() => updateReviewSetting("lineColor", "white")}
+                >
+                  Белый
+                </button>
+              </div>
+              <div className="review-control-group review-control-group-wide">
+                <span>Обзор</span>
+                {[
+                  ["default", "По умолчанию"],
+                  ["tele", "Телевик"],
+                  ["wide", "Угловая"]
+                ].map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={reviewSettings.lens === id}
+                    onClick={() => updateReviewSetting("lens", id)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <label className="review-color-control">
+                <span>Каркас</span>
+                <input
+                  type="color"
+                  value={reviewSettings.frameColor}
+                  onChange={(event) => updateReviewSetting("frameColor", event.target.value)}
+                />
+              </label>
+              <label className="review-color-control">
+                <span>Ступени</span>
+                <input
+                  type="color"
+                  value={reviewSettings.stepColor}
+                  onChange={(event) => updateReviewSetting("stepColor", event.target.value)}
+                />
+              </label>
+            </div>
             <Suspense fallback={<div className="model-viewer-shell model-viewer-loading">Загрузка 3D viewer</div>}>
-              <ModelViewer3D modelUrl={reviewModel.url} title={reviewModel.name} settings={productModelSettings} className="review-model-viewer" />
+              <ModelViewer3D modelUrl={reviewModel.url} title={decodeUploadedName(reviewModel.name)} settings={reviewSettings} className="review-model-viewer" />
             </Suspense>
           </div>
         </div>

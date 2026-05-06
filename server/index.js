@@ -167,6 +167,17 @@ function requireSketchUpExport(req, res, next) {
   next();
 }
 
+function normalizeUploadedName(name) {
+  const value = String(name || "");
+
+  if (!/[\u00c3\u00d0\u00d1]/.test(value)) {
+    return value;
+  }
+
+  const decoded = Buffer.from(value, "latin1").toString("utf8");
+  return decoded.includes("\uFFFD") ? value : decoded;
+}
+
 function normalizeStringArray(value) {
   return Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : [];
 }
@@ -373,7 +384,7 @@ app.post("/api/sketchup/model/upload", requireSketchUpExport, upload.single("mod
   }
 
   const activeFile = {
-    name: file.originalname,
+    name: normalizeUploadedName(file.originalname),
     size: file.size,
     url: `/uploads/models/${file.filename}`,
     uploadedAt: new Date().toISOString()
@@ -605,7 +616,7 @@ app.post("/api/model/upload", requireAdmin, upload.single("model"), async (req, 
   }
 
   const activeFile = {
-    name: file.originalname,
+    name: normalizeUploadedName(file.originalname),
     size: file.size,
     url: `/uploads/models/${file.filename}`,
     uploadedAt: new Date().toISOString()
@@ -625,7 +636,7 @@ app.post("/api/review-model/upload", upload.single("model"), async (req, res) =>
   }
 
   res.status(201).json({
-    name: file.originalname,
+    name: normalizeUploadedName(file.originalname),
     size: file.size,
     url: `/uploads/models/${file.filename}`,
     uploadedAt: new Date().toISOString()

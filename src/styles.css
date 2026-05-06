@@ -1334,6 +1334,81 @@ img {
   font-style: normal;
 }
 
+.review-model-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+  color: rgba(246, 239, 231, 0.72);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+.review-switch,
+.review-control-group,
+.review-color-control {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  border: 1px solid rgba(246, 239, 231, 0.14);
+  border-radius: 8px;
+  background: rgba(246, 239, 231, 0.06);
+}
+
+.review-switch {
+  gap: 8px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.review-switch input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--bronze);
+}
+
+.review-control-group {
+  overflow: hidden;
+}
+
+.review-control-group span,
+.review-color-control span {
+  padding: 0 10px;
+  color: rgba(246, 239, 231, 0.54);
+  text-transform: uppercase;
+}
+
+.review-control-group button {
+  min-height: 34px;
+  border: 0;
+  border-left: 1px solid rgba(246, 239, 231, 0.14);
+  padding: 0 10px;
+  background: transparent;
+  color: rgba(246, 239, 231, 0.74);
+  font: inherit;
+  cursor: pointer;
+}
+
+.review-control-group button[aria-pressed="true"] {
+  background: var(--bronze);
+  color: #101722;
+}
+
+.review-color-control {
+  gap: 2px;
+  padding-right: 8px;
+}
+
+.review-color-control input {
+  width: 28px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
 .review-model-viewer {
   min-height: min(64svh, 620px);
 }
@@ -2842,6 +2917,19 @@ img {
   .review-upload-inner,
   .review-model-dialog {
     padding: 18px;
+  }
+
+  .review-model-toolbar {
+    gap: 8px;
+    font-size: 0.62rem;
+  }
+
+  .review-control-group-wide {
+    width: 100%;
+  }
+
+  .review-control-group button {
+    padding-inline: 8px;
   }
 
   .model-viewer-shell,
