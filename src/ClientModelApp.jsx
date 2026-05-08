@@ -93,7 +93,7 @@ function buildAbsolutePath(path) {
 }
 
 async function getActiveModelLink() {
-  const response = await fetch("/api/client-model");
+  return null;
 
   if (!response.ok) {
     return null;
@@ -234,27 +234,27 @@ export default function ClientModelApp() {
 
   useEffect(() => {
     let cancelled = false;
+
+    if (!token) {
+      setLink(null);
+      setStatus("missing");
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
     setStatus("loading");
 
     async function loadLink() {
       try {
-        let data = null;
+        const response = await fetch(`/api/client-links/${encodeURIComponent(token)}`);
 
-        if (token) {
-          const response = await fetch(`/api/client-links/${encodeURIComponent(token)}`);
-
-          if (response.ok) {
-            data = await response.json();
-          }
-        }
-
-        if (!data) {
-          data = await getActiveModelLink();
-        }
-
-        if (!data) {
+        if (!response.ok) {
           throw new Error("not-found");
         }
+
+        const data = await response.json();
 
         if (cancelled) {
           return;
@@ -277,7 +277,7 @@ export default function ClientModelApp() {
   }, [token]);
 
   if (status === "missing") {
-    return <ClientModelError message="Ссылка без токена модели." />;
+    return <ClientModelError message="Персональная модель не выбрана. Откройте ссылку, которую отправил менеджер." />;
   }
 
   if (status === "error") {
