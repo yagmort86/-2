@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -157,6 +157,24 @@ function getBackgroundColor(background) {
   return null;
 }
 
+function getLoadableModelUrl(modelUrl) {
+  if (!modelUrl) {
+    return "";
+  }
+
+  const url = new URL(modelUrl, window.location.origin);
+
+  if (url.origin === window.location.origin) {
+    return `${url.pathname}${url.search}${url.hash}`;
+  }
+
+  if (url.hostname.endsWith(".public.blob.vercel-storage.com")) {
+    return `/api/proxy-model?url=${encodeURIComponent(url.href)}`;
+  }
+
+  return url.href;
+}
+
 export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, className = "" }) {
   const mountRef = useRef(null);
   const activeObjectRef = useRef(null);
@@ -164,6 +182,7 @@ export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, cla
   const controlsRef = useRef(null);
   const rendererRef = useRef(null);
   const viewerSettingsRef = useRef(defaultSettings);
+  const [loadError, setLoadError] = useState(false);
   const viewerSettings = { ...defaultSettings, ...settings };
 
   viewerSettingsRef.current = viewerSettings;
@@ -259,12 +278,18 @@ export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, cla
     }
 
     const loader = new GLTFLoader();
-    if (modelUrl) {
+    const loadableModelUrl = getLoadableModelUrl(modelUrl);
+    setLoadError(false);
+
+    if (loadableModelUrl) {
       loader.load(
-        modelUrl,
-        (gltf) => setSceneObject(gltf.scene),
+        loadableModelUrl,
+        (gltf) => {
+          setLoadError(false);
+          setSceneObject(gltf.scene);
+        },
         undefined,
-        () => setSceneObject(makeFallbackStair())
+        () => setLoadError(true)
       );
     } else {
       setSceneObject(makeFallbackStair());
@@ -346,6 +371,7 @@ export function ModelViewer3D({ modelUrl, title, settings = defaultSettings, cla
   return (
     <div className={`model-viewer-shell ${className}`}>
       <div className="model-viewer-canvas" ref={mountRef} aria-label={`3D модель ${title}`} />
+      {loadError ? <div className="model-viewer-error">Не удалось открыть 3D-файл.</div> : null}
       <div className="model-viewer-controls" aria-label="Управление 3D моделью">
         <div className="mouse-keys" aria-hidden="true">
           <span />

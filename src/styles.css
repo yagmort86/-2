@@ -1499,6 +1499,19 @@ img {
   text-transform: uppercase;
 }
 
+.model-viewer-error {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: rgba(246, 239, 231, 0.86);
+  font-size: 1rem;
+  text-align: center;
+  background: rgba(21, 21, 21, 0.48);
+}
+
 .model-viewer-canvas canvas {
   display: block;
   width: 100%;

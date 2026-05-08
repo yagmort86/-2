@@ -22,7 +22,17 @@ import {
   Typography
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router";
-import { clearModel, createClientLink, getModel, updateModel, uploadModel, uploadProductAssets } from "./providers";
+import {
+  clearClientModel,
+  clearModel,
+  createClientLink,
+  getClientModel,
+  getModel,
+  updateModel,
+  uploadClientModel,
+  uploadModel,
+  uploadProductAssets
+} from "./providers";
 
 const resourceTitles = {
   products: "Товары",
@@ -561,8 +571,6 @@ export function LoginPage() {
 export function ModelPage() {
   const [model, setModel] = useState(null);
   const [status, setStatus] = useState("");
-  const [clientTitle, setClientTitle] = useState("");
-  const [clientLink, setClientLink] = useState(null);
 
   useEffect(() => {
     getModel().then(setModel).catch(() => setStatus("Не удалось загрузить модель."));
@@ -609,9 +617,98 @@ export function ModelPage() {
     }
   }
 
+  if (!model) {
+    return <Typography>Загрузка...</Typography>;
+  }
+
+  return (
+    <Paper className="admin-form-panel" variant="outlined">
+      <Stack spacing={2.5}>
+        <Typography variant="h5">3D-модель на главном блоке</Typography>
+        {status ? <Alert severity={status.includes("Не удалось") || status.includes("Сначала") ? "error" : "success"}>{status}</Alert> : null}
+        <Box className="admin-model-file">
+          <Typography variant="caption">Активный файл</Typography>
+          <Typography>{model.activeFile?.name || "Не загружен"}</Typography>
+          {model.activeFile?.url ? <Typography variant="body2">{model.activeFile.url}</Typography> : null}
+        </Box>
+        <Stack direction="row" spacing={1.5}>
+          <Button variant="contained" component="label">
+            Загрузить GLB / GLTF
+            <input hidden type="file" accept=".glb,.gltf" onChange={upload} />
+          </Button>
+          <Button variant="outlined" color="error" onClick={clear}>
+            Удалить
+          </Button>
+        </Stack>
+        <Stack spacing={1}>
+          <Typography variant="subtitle1">Ракурс</Typography>
+          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+            {cameraAngles.map((angle) => (
+              <Button
+                variant={model.settings?.cameraAngle === angle.id ? "contained" : "outlined"}
+                key={angle.id}
+                onClick={() => updateSetting("cameraAngle", angle.id)}
+              >
+                {angle.label}
+              </Button>
+            ))}
+          </Stack>
+        </Stack>
+        <Stack spacing={1}>
+          <FormControlLabel
+            control={<Switch checked={Boolean(model.settings?.showLines)} onChange={(event) => updateSetting("showLines", event.target.checked)} />}
+            label="Показывать линии граней"
+          />
+          <FormControlLabel
+            control={<Switch checked={Boolean(model.settings?.shadows)} onChange={(event) => updateSetting("shadows", event.target.checked)} />}
+            label="Мягкие тени"
+          />
+        </Stack>
+      </Stack>
+    </Paper>
+  );
+}
+
+export function ClientModelPage() {
+  const [model, setModel] = useState(null);
+  const [status, setStatus] = useState("");
+  const [clientTitle, setClientTitle] = useState("");
+  const [clientLink, setClientLink] = useState(null);
+
+  useEffect(() => {
+    getClientModel().then(setModel).catch(() => setStatus("Не удалось загрузить модель клиента."));
+  }, []);
+
+  async function upload(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      setModel(await uploadClientModel(file));
+      setClientLink(null);
+      setStatus("Модель клиента загружена.");
+    } catch (error) {
+      setStatus(error.message || "Не удалось загрузить GLB/GLTF.");
+    }
+  }
+
+  async function clear() {
+    try {
+      setModel(await clearClientModel());
+      setClientLink(null);
+      setStatus("Модель клиента удалена.");
+    } catch {
+      setStatus("Не удалось удалить модель клиента.");
+    }
+  }
+
   async function createLink() {
     if (!model.activeFile?.url) {
-      setStatus("Сначала загрузите GLB/GLTF модель.");
+      setStatus("Сначала загрузите GLB/GLTF модель клиента.");
       return;
     }
 
@@ -641,7 +738,7 @@ export function ModelPage() {
   return (
     <Paper className="admin-form-panel" variant="outlined">
       <Stack spacing={2.5}>
-        <Typography variant="h5">3D-модель на главном блоке</Typography>
+        <Typography variant="h5">3D-модель для клиента</Typography>
         {status ? <Alert severity={status.includes("Не удалось") || status.includes("Сначала") ? "error" : "success"}>{status}</Alert> : null}
         <Box className="admin-model-file">
           <Typography variant="caption">Активный файл</Typography>
@@ -686,30 +783,6 @@ export function ModelPage() {
               </Stack>
             </Stack>
           ) : null}
-        </Stack>
-        <Stack spacing={1}>
-          <Typography variant="subtitle1">Ракурс</Typography>
-          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-            {cameraAngles.map((angle) => (
-              <Button
-                variant={model.settings?.cameraAngle === angle.id ? "contained" : "outlined"}
-                key={angle.id}
-                onClick={() => updateSetting("cameraAngle", angle.id)}
-              >
-                {angle.label}
-              </Button>
-            ))}
-          </Stack>
-        </Stack>
-        <Stack spacing={1}>
-          <FormControlLabel
-            control={<Switch checked={Boolean(model.settings?.showLines)} onChange={(event) => updateSetting("showLines", event.target.checked)} />}
-            label="Показывать линии граней"
-          />
-          <FormControlLabel
-            control={<Switch checked={Boolean(model.settings?.shadows)} onChange={(event) => updateSetting("shadows", event.target.checked)} />}
-            label="Мягкие тени"
-          />
         </Stack>
       </Stack>
     </Paper>

@@ -18,6 +18,7 @@ import WidgetsOutlinedIcon from "@mui/icons-material/WidgetsOutlined";
 import { authProvider, dataProvider } from "./providers";
 import {
   AdminHeader,
+  ClientModelPage,
   LoginPage,
   ModelPage,
   ResourceForm,
@@ -124,10 +125,18 @@ const resources = [
     }
   },
   {
-    name: "model",
-    list: "/model",
+    name: "site-model",
+    list: "/site-model",
     meta: {
-      label: "3D-модель",
+      label: "3D на сайт",
+      icon: <ViewInArOutlinedIcon />
+    }
+  },
+  {
+    name: "client-model",
+    list: "/client-model",
+    meta: {
+      label: "Модель клиенту",
       icon: <ViewInArOutlinedIcon />
     }
   }
@@ -192,7 +201,9 @@ export default function AdminApp() {
                     <Route path="show/:id" element={<ResourceShow resource={resource} />} />
                   </Route>
                 ))}
-                <Route path="model" element={<ModelPage />} />
+                <Route path="site-model" element={<ModelPage />} />
+                <Route path="client-model" element={<ClientModelPage />} />
+                <Route path="model" element={<Navigate to="/site-model" replace />} />
               </Route>
 
               <Route path="/" element={<Navigate to="/products" replace />} />

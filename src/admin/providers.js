@@ -256,6 +256,28 @@ export async function clearModel() {
   });
 }
 
+export async function getClientModel() {
+  return request("/api/client-model");
+}
+
+export async function uploadClientModel(file) {
+  const body = new FormData();
+  body.append("model", file);
+
+  return request("/api/client-model/upload", {
+    method: "POST",
+    headers: authHeaders(),
+    body
+  });
+}
+
+export async function clearClientModel() {
+  return request("/api/client-model", {
+    method: "DELETE",
+    headers: authHeaders()
+  });
+}
+
 export async function createClientLink(payload) {
   return request("/api/client-links", jsonOptions("POST", payload));
 }

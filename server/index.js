@@ -66,6 +66,9 @@ const defaultContent = {
     activeFile: null,
     settings: defaultModelSettings
   },
+  clientModel: {
+    activeFile: null
+  },
   clientLinks: []
 };
 
@@ -94,6 +97,10 @@ function mergeContent(content = {}) {
         ...defaultModelSettings,
         ...content.model?.settings
       }
+    },
+    clientModel: {
+      ...defaultContent.clientModel,
+      ...content.clientModel
     },
     clientLinks: Array.isArray(content.clientLinks) ? content.clientLinks : []
   };
@@ -258,6 +265,10 @@ function createClientLinkResponse(link) {
   };
 }
 
+function isProxyAllowed(url) {
+  return url.protocol === "https:" && url.hostname.endsWith(".public.blob.vercel-storage.com");
+}
+
 async function storeUploadedFile(file, folder) {
   if (!file) {
     return "";
@@ -345,6 +356,34 @@ app.get("/api/auth/session", requireAdmin, (_req, res) => {
 
 app.get("/api/content", async (_req, res) => {
   res.json(await readContent());
+});
+
+app.get("/api/proxy-model", async (req, res) => {
+  let url;
+
+  try {
+    url = new URL(String(req.query.url || ""));
+  } catch {
+    res.status(400).json({ error: "Invalid model URL" });
+    return;
+  }
+
+  if (!isProxyAllowed(url)) {
+    res.status(400).json({ error: "Model host is not allowed" });
+    return;
+  }
+
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    res.status(response.status).json({ error: "Model file not found" });
+    return;
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  res.set("Cache-Control", "public, max-age=31536000, immutable");
+  res.set("Content-Type", response.headers.get("content-type") || "model/gltf-binary");
+  res.send(buffer);
 });
 
 app.get("/api/blog", async (_req, res) => {
@@ -728,6 +767,39 @@ app.delete("/api/model", requireAdmin, async (_req, res) => {
   res.json(content.model);
 });
 
+app.get("/api/client-model", async (_req, res) => {
+  const content = await readContent();
+  res.json(content.clientModel);
+});
+
+app.post("/api/client-model/upload", requireAdmin, upload.single("model"), async (req, res) => {
+  const content = await readContent();
+  const file = req.file;
+
+  if (!file) {
+    res.status(400).json({ error: "GLB or GLTF file required" });
+    return;
+  }
+
+  const activeFile = {
+    name: normalizeUploadedName(file.originalname),
+    size: file.size,
+    url: await storeUploadedFile(file, "models"),
+    uploadedAt: new Date().toISOString()
+  };
+
+  content.clientModel.activeFile = activeFile;
+  await writeContent(content);
+  res.status(201).json(content.clientModel);
+});
+
+app.delete("/api/client-model", requireAdmin, async (_req, res) => {
+  const content = await readContent();
+  content.clientModel.activeFile = null;
+  await writeContent(content);
+  res.json(content.clientModel);
+});
+
 app.get("/api/client-links", requireAdmin, async (_req, res) => {
   const content = await readContent();
   res.json(content.clientLinks.map(createClientLinkResponse));
@@ -738,7 +810,8 @@ app.post("/api/client-links", requireAdmin, async (req, res) => {
   const product = req.body.productId
     ? content.products.find((item) => item.id === req.body.productId)
     : null;
-  const modelUrl = String(req.body.modelUrl || product?.modelUrl || content.model.activeFile?.url || "").trim();
+  const clientFile = content.clientModel.activeFile || content.model.activeFile;
+  const modelUrl = String(req.body.modelUrl || product?.modelUrl || clientFile?.url || "").trim();
 
   if (!modelUrl) {
     res.status(400).json({ error: "Model URL required" });
@@ -752,7 +825,7 @@ app.post("/api/client-links", requireAdmin, async (req, res) => {
 
   const link = {
     token,
-    title: String(req.body.title || product?.title || content.model.activeFile?.name || "Лестница").trim(),
+    title: String(req.body.title || product?.title || clientFile?.name || "Лестница").trim(),
     modelUrl,
     productId: product?.id || null,
     createdAt: new Date().toISOString()
