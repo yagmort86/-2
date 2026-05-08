@@ -622,8 +622,12 @@ export function ModelPage() {
       });
       setClientLink(`${window.location.origin}${link.publicPath}`);
       setStatus("Ссылка для клиента создана.");
-    } catch {
-      setStatus("Не удалось создать клиентскую ссылку.");
+    } catch (error) {
+      setStatus(
+        error.statusCode === 401
+          ? "Сессия истекла. Войдите заново."
+          : "Не удалось создать клиентскую ссылку."
+      );
     }
   }
 

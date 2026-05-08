@@ -185,16 +185,29 @@ export const authProvider = {
     };
   },
   check: async () => {
-    if (getToken()) {
+    if (!getToken()) {
       return {
-        authenticated: true
+        authenticated: false,
+        redirectTo: "/login"
       };
     }
 
-    return {
-      authenticated: false,
-      redirectTo: "/login"
-    };
+    try {
+      await request("/api/auth/session", {
+        headers: authHeaders()
+      });
+
+      return {
+        authenticated: true
+      };
+    } catch {
+      localStorage.removeItem(TOKEN_KEY);
+
+      return {
+        authenticated: false,
+        redirectTo: "/login"
+      };
+    }
   },
   onError: async (error) => {
     if (error.statusCode === 401) {

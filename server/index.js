@@ -16,6 +16,7 @@ const productImageDir = path.join(uploadDir, "products");
 const contentFile = path.join(dataDir, "content.json");
 const distPath = path.join(projectRoot, "dist");
 const port = Number(process.env.PORT || 3001);
+const isVercel = Boolean(process.env.VERCEL);
 const adminUsername = "admin";
 const adminPassword = "555837";
 const adminSecret = process.env.ADMIN_SECRET || "chaika-admin-local-secret";
@@ -67,6 +68,10 @@ const defaultContent = {
 };
 
 async function ensureStorage() {
+  if (isVercel) {
+    return;
+  }
+
   await fs.mkdir(modelUploadDir, { recursive: true });
   await fs.mkdir(productImageDir, { recursive: true });
 
@@ -260,7 +265,7 @@ const productUpload = multer({
 
 await ensureStorage();
 
-const app = express();
+export const app = express();
 app.use(express.json({ limit: "1mb" }));
 app.use("/uploads", express.static(uploadDir));
 
@@ -275,6 +280,10 @@ app.post("/api/auth/login", (req, res) => {
   }
 
   res.json({ token: signAdminToken(), user: adminUsername });
+});
+
+app.get("/api/auth/session", requireAdmin, (_req, res) => {
+  res.json({ user: adminUsername });
 });
 
 app.get("/api/content", async (_req, res) => {
@@ -709,13 +718,17 @@ app.get("/api/client-links/:token", async (req, res) => {
   res.json(createClientLinkResponse(link));
 });
 
-if (existsSync(distPath)) {
+if (!isVercel && existsSync(distPath)) {
   app.use(express.static(distPath));
   app.get(/^(?!\/api\/|\/uploads\/).*/, (_req, res) => {
     res.sendFile(path.join(distPath, "index.html"));
   });
 }
 
-app.listen(port, () => {
-  console.log(`API server listening on http://localhost:${port}`);
-});
+if (!isVercel) {
+  app.listen(port, () => {
+    console.log(`API server listening on http://localhost:${port}`);
+  });
+}
+
+export default app;
