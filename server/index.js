@@ -24,6 +24,12 @@ const adminPassword = "555837";
 const adminSecret = process.env.ADMIN_SECRET || "chaika-admin-local-secret";
 const sketchupApiKey = process.env.SKETCHUP_API_KEY || adminSecret;
 const telegramBotUsername = process.env.TELEGRAM_BOT_USERNAME || "chaikalestnica_bot";
+const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN || "";
+const telegramChatId = process.env.TELEGRAM_CHAT_ID || "";
+const maxBotToken = process.env.MAX_BOT_TOKEN || "";
+const maxUserId = process.env.MAX_USER_ID || "";
+const maxChatId = process.env.MAX_CHAT_ID || "";
+const leadTargetPhone = process.env.LEAD_TARGET_PHONE || "+79042705837";
 
 const defaultModelSettings = {
   cameraAngle: "axon",
@@ -228,6 +234,10 @@ function normalizeStringArray(value) {
   return Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : [];
 }
 
+function cleanLeadField(value, maxLength = 1000) {
+  return String(value || "").trim().slice(0, maxLength);
+}
+
 function normalizeSpecs(value) {
   if (!Array.isArray(value)) {
     return [];
@@ -267,6 +277,68 @@ function createClientLinkResponse(link) {
 
 function isProxyAllowed(url) {
   return url.protocol === "https:" && url.hostname.endsWith(".public.blob.vercel-storage.com");
+}
+
+function formatLeadMessage(lead) {
+  return [
+    "Новая заявка с сайта",
+    "",
+    `Имя: ${lead.name}`,
+    `Регион: ${lead.region}`,
+    `Связь: ${lead.contactMethod}`,
+    `Контакт: ${lead.contact}`,
+    lead.productModel ? `Модель: ${lead.productModel}` : "",
+    lead.woodType ? `Древесина: ${lead.woodType}` : "",
+    lead.message ? `Комментарий: ${lead.message}` : "",
+    `Получатель MAX: ${leadTargetPhone}`,
+    lead.page ? `Страница: ${lead.page}` : ""
+  ].filter(Boolean).join("\n");
+}
+
+async function sendTelegramLead(text) {
+  if (!telegramBotToken || !telegramChatId) {
+    return false;
+  }
+
+  const response = await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      chat_id: telegramChatId,
+      text,
+      disable_web_page_preview: true
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error("Telegram notification failed");
+  }
+
+  return true;
+}
+
+async function sendMaxLead(text) {
+  if (!maxBotToken || (!maxUserId && !maxChatId)) {
+    return false;
+  }
+
+  const params = new URLSearchParams(maxChatId ? { chat_id: maxChatId } : { user_id: maxUserId });
+  const response = await fetch(`https://platform-api.max.ru/messages?${params}`, {
+    method: "POST",
+    headers: {
+      Authorization: maxBotToken,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ text })
+  });
+
+  if (!response.ok) {
+    throw new Error("MAX notification failed");
+  }
+
+  return true;
 }
 
 async function storeUploadedFile(file, folder) {
@@ -356,6 +428,38 @@ app.get("/api/auth/session", requireAdmin, (_req, res) => {
 
 app.get("/api/content", async (_req, res) => {
   res.json(await readContent());
+});
+
+app.post("/api/leads", async (req, res) => {
+  const lead = {
+    name: cleanLeadField(req.body.name, 120),
+    region: cleanLeadField(req.body.region, 160),
+    contactMethod: cleanLeadField(req.body.contactMethod, 40),
+    contact: cleanLeadField(req.body.contact, 180),
+    message: cleanLeadField(req.body.message, 1800),
+    productModel: cleanLeadField(req.body.productModel, 180),
+    woodType: cleanLeadField(req.body.woodType, 120),
+    page: cleanLeadField(req.body.page, 300)
+  };
+
+  if (!lead.name || !lead.region || !lead.contact) {
+    res.status(400).json({ error: "Name, region and contact are required" });
+    return;
+  }
+
+  const text = formatLeadMessage(lead);
+  const results = await Promise.allSettled([
+    sendTelegramLead(text),
+    sendMaxLead(text)
+  ]);
+  const sent = results.filter((result) => result.status === "fulfilled" && result.value).length;
+
+  if (!sent) {
+    res.status(503).json({ error: "Lead notifications are not configured" });
+    return;
+  }
+
+  res.status(201).json({ ok: true });
 });
 
 app.get("/api/proxy-model", async (req, res) => {

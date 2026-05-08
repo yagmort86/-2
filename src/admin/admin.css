@@ -8,9 +8,32 @@
   border-bottom: 1px solid #3f403d;
   background: #151515;
   display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-topbar-main {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+
+.admin-mobile-nav {
+  display: none;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.admin-mobile-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.admin-mobile-nav .MuiButton-root {
+  min-height: 44px;
+  flex: 0 0 auto;
 }
 
 .admin-title {
@@ -114,7 +137,7 @@
 }
 
 @media (max-width: 700px) {
-  .admin-topbar {
+  .admin-topbar-main {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -126,5 +149,11 @@
   .admin-form-panel,
   .admin-show-panel {
     padding: 18px;
+  }
+}
+
+@media (max-width: 900px) {
+  .admin-mobile-nav {
+    display: flex;
   }
 }

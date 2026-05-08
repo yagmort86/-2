@@ -21,7 +21,7 @@ import {
   TextField,
   Typography
 } from "@mui/material";
-import { useNavigate, useParams } from "react-router";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
 import {
   clearClientModel,
   clearModel,
@@ -80,6 +80,15 @@ const cameraAngles = [
   { id: "side", label: "Сбоку" },
   { id: "front", label: "Фасад" },
   { id: "top", label: "Сверху" }
+];
+
+const adminNavItems = [
+  { to: "/products", label: "Товары" },
+  { to: "/blog", label: "Блог" },
+  { to: "/news", label: "Новости" },
+  { to: "/other-products", label: "Другие" },
+  { to: "/site-model", label: "3D на сайт" },
+  { to: "/client-model", label: "Модель клиенту" }
 ];
 
 function linesToArray(value) {
@@ -791,21 +800,41 @@ export function ClientModelPage() {
 
 export function AdminHeader() {
   const { mutate: logout } = useLogout();
+  const location = useLocation();
 
   return (
     <Box className="admin-topbar">
-      <Box>
-        <Typography variant="overline">CMS</Typography>
-        <Typography variant="h6">Металлокаркасы лестниц</Typography>
+      <Box className="admin-topbar-main">
+        <Box>
+          <Typography variant="overline">CMS</Typography>
+          <Typography variant="h6">Металлокаркасы лестниц</Typography>
+        </Box>
+        <Stack direction="row" spacing={1}>
+          <Button href="/" variant="outlined">
+            На сайт
+          </Button>
+          <Button variant="contained" onClick={() => logout()}>
+            Выйти
+          </Button>
+        </Stack>
       </Box>
-      <Stack direction="row" spacing={1}>
-        <Button href="/" variant="outlined">
-          На сайт
-        </Button>
-        <Button variant="contained" onClick={() => logout()}>
-          Выйти
-        </Button>
-      </Stack>
+      <Box component="nav" className="admin-mobile-nav" aria-label="Разделы админки">
+        {adminNavItems.map((item) => {
+          const active = location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
+
+          return (
+            <Button
+              component={Link}
+              key={item.to}
+              size="small"
+              to={item.to}
+              variant={active ? "contained" : "outlined"}
+            >
+              {item.label}
+            </Button>
+          );
+        })}
+      </Box>
     </Box>
   );
 }

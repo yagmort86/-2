@@ -19,6 +19,16 @@ export function getContent() {
   return request("/api/content");
 }
 
+export function createLead(lead) {
+  return request("/api/leads", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(lead)
+  });
+}
+
 export function loginAdmin(credentials) {
   return request("/api/auth/login", {
     method: "POST",

@@ -8,6 +8,7 @@ import { fallbackNews, fallbackOtherProducts } from "./content/cmsFallback";
 import { workGalleries } from "./content/workGalleries";
 import {
   createBlogPost,
+  createLead,
   createNewsItem,
   createOtherProduct,
   getContent,
@@ -224,6 +225,8 @@ function SectionHeader({ eyebrow, title, text }) {
 
 function LeadForm({ requestContext }) {
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -236,9 +239,34 @@ function LeadForm({ requestContext }) {
     );
   }, [requestContext]);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    setSubmitted(true);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+
+    setSubmitting(true);
+    setSubmitted(false);
+    setError("");
+
+    try {
+      await createLead({
+        name: formData.get("name"),
+        region: formData.get("region"),
+        contactMethod: formData.get("contactMethod"),
+        contact: formData.get("contact"),
+        message: formData.get("message"),
+        productModel: formData.get("productModel"),
+        woodType: formData.get("woodType"),
+        page: window.location.href
+      });
+      setSubmitted(true);
+      form.reset();
+      setMessage("");
+    } catch {
+      setError("Не удалось отправить заявку. Напишите в Telegram или MAX.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -304,13 +332,14 @@ function LeadForm({ requestContext }) {
         />
       </label>
 
-      <button className="button primary" type="submit">
+      <button className="button primary" type="submit" disabled={submitting}>
         Получить расчет
         <ArrowRight size={18} />
       </button>
 
       <p className="form-note">Работаем по России. Предварительный расчет можно сделать по фото, плану или размерам.</p>
       {submitted ? <p className="form-success">Заявка принята. Ответим выбранным способом.</p> : null}
+      {error ? <p className="form-error">{error}</p> : null}
     </form>
   );
 }

@@ -2088,7 +2088,8 @@ img {
 }
 
 .form-note,
-.form-success {
+.form-success,
+.form-error {
   margin: 12px 0 0;
   color: var(--steel);
   font-size: 0.86rem;
@@ -2096,6 +2097,11 @@ img {
 
 .form-success {
   color: var(--bronze-dark);
+  font-weight: 700;
+}
+
+.form-error {
+  color: #a33424;
   font-weight: 700;
 }
 
