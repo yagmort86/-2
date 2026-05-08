@@ -9,14 +9,15 @@ const resourcePaths = {
 
 async function request(path, options = {}) {
   const response = await fetch(path, options);
+  const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const error = new Error(`API ${response.status}: ${path}`);
+    const error = new Error(payload?.error || `API ${response.status}: ${path}`);
     error.statusCode = response.status;
     throw error;
   }
 
-  return response.json();
+  return payload;
 }
 
 function getToken() {

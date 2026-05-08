@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { get, put } from "@vercel/blob";
 import express from "express";
 import multer from "multer";
 import { productModels } from "../src/content/siteData.js";
@@ -17,6 +18,7 @@ const contentFile = path.join(dataDir, "content.json");
 const distPath = path.join(projectRoot, "dist");
 const port = Number(process.env.PORT || 3001);
 const isVercel = Boolean(process.env.VERCEL);
+const blobContentPath = "cms/content.json";
 const adminUsername = "admin";
 const adminPassword = "555837";
 const adminSecret = process.env.ADMIN_SECRET || "chaika-admin-local-secret";
@@ -80,10 +82,7 @@ async function ensureStorage() {
   }
 }
 
-async function readContent() {
-  const raw = await fs.readFile(contentFile, "utf8");
-  const content = JSON.parse(raw);
-
+function mergeContent(content = {}) {
   return {
     ...defaultContent,
     ...content,
@@ -100,7 +99,39 @@ async function readContent() {
   };
 }
 
+function requireBlobToken() {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    const error = new Error("На Vercel не настроен Blob Storage: добавьте BLOB_READ_WRITE_TOKEN.");
+    error.statusCode = 503;
+    throw error;
+  }
+}
+
+async function readContent() {
+  if (isVercel && process.env.BLOB_READ_WRITE_TOKEN) {
+    const storedContent = await get(blobContentPath, { access: "public" });
+
+    if (storedContent?.stream) {
+      const raw = await new Response(storedContent.stream).text();
+      return mergeContent(JSON.parse(raw));
+    }
+  }
+
+  const raw = await fs.readFile(contentFile, "utf8");
+  return mergeContent(JSON.parse(raw));
+}
+
 async function writeContent(content) {
+  if (isVercel) {
+    requireBlobToken();
+    await put(blobContentPath, JSON.stringify(content, null, 2), {
+      access: "public",
+      allowOverwrite: true,
+      contentType: "application/json"
+    });
+    return;
+  }
+
   await fs.writeFile(contentFile, JSON.stringify(content, null, 2), "utf8");
 }
 
@@ -225,14 +256,36 @@ function createClientLinkResponse(link) {
   };
 }
 
+async function storeUploadedFile(file, folder) {
+  if (!file) {
+    return "";
+  }
+
+  if (!isVercel) {
+    return `/uploads/${folder}/${file.filename}`;
+  }
+
+  requireBlobToken();
+  const extension = path.extname(file.originalname).toLowerCase() || (folder === "models" ? ".glb" : "");
+  const blob = await put(`uploads/${folder}/${crypto.randomUUID()}${extension}`, file.buffer, {
+    access: "public",
+    contentType: file.mimetype || undefined,
+    multipart: file.size > 5 * 1024 * 1024
+  });
+
+  return blob.url;
+}
+
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, callback) => callback(null, modelUploadDir),
-    filename: (_req, file, callback) => {
-      const extension = path.extname(file.originalname).toLowerCase() || ".glb";
-      callback(null, `${crypto.randomUUID()}${extension}`);
-    }
-  }),
+  storage: isVercel
+    ? multer.memoryStorage()
+    : multer.diskStorage({
+        destination: (_req, _file, callback) => callback(null, modelUploadDir),
+        filename: (_req, file, callback) => {
+          const extension = path.extname(file.originalname).toLowerCase() || ".glb";
+          callback(null, `${crypto.randomUUID()}${extension}`);
+        }
+      }),
   fileFilter: (_req, file, callback) => {
     const extension = path.extname(file.originalname).toLowerCase();
     callback(null, extension === ".glb" || extension === ".gltf");
@@ -243,15 +296,17 @@ const upload = multer({
 });
 
 const productUpload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, file, callback) => {
-      callback(null, file.fieldname === "model" ? modelUploadDir : productImageDir);
-    },
-    filename: (_req, file, callback) => {
-      const extension = path.extname(file.originalname).toLowerCase();
-      callback(null, `${crypto.randomUUID()}${extension}`);
-    }
-  }),
+  storage: isVercel
+    ? multer.memoryStorage()
+    : multer.diskStorage({
+        destination: (_req, file, callback) => {
+          callback(null, file.fieldname === "model" ? modelUploadDir : productImageDir);
+        },
+        filename: (_req, file, callback) => {
+          const extension = path.extname(file.originalname).toLowerCase();
+          callback(null, `${crypto.randomUUID()}${extension}`);
+        }
+      }),
   fileFilter: (_req, file, callback) => {
     const extension = path.extname(file.originalname).toLowerCase();
     const imageExtensions = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
@@ -371,18 +426,18 @@ app.post(
     const model = req.files?.model?.[0];
 
     if (cover) {
-      product.cover = `/uploads/products/${cover.filename}`;
+      product.cover = await storeUploadedFile(cover, "products");
     }
 
     if (photos.length) {
       product.photos = [
         ...(product.photos || []),
-        ...photos.map((file) => `/uploads/products/${file.filename}`)
+        ...(await Promise.all(photos.map((file) => storeUploadedFile(file, "products"))))
       ];
     }
 
     if (model) {
-      product.modelUrl = `/uploads/models/${model.filename}`;
+      product.modelUrl = await storeUploadedFile(model, "models");
     }
 
     await writeContent(content);
@@ -407,7 +462,7 @@ app.post("/api/sketchup/model/upload", requireSketchUpExport, upload.single("mod
   const activeFile = {
     name: normalizeUploadedName(file.originalname),
     size: file.size,
-    url: `/uploads/models/${file.filename}`,
+    url: await storeUploadedFile(file, "models"),
     uploadedAt: new Date().toISOString()
   };
 
@@ -431,7 +486,7 @@ app.post("/api/sketchup/products/:id/upload", requireSketchUpExport, upload.sing
     return;
   }
 
-  product.modelUrl = `/uploads/models/${file.filename}`;
+  product.modelUrl = await storeUploadedFile(file, "models");
   await writeContent(content);
   res.status(201).json(product);
 });
@@ -639,7 +694,7 @@ app.post("/api/model/upload", requireAdmin, upload.single("model"), async (req, 
   const activeFile = {
     name: normalizeUploadedName(file.originalname),
     size: file.size,
-    url: `/uploads/models/${file.filename}`,
+    url: await storeUploadedFile(file, "models"),
     uploadedAt: new Date().toISOString()
   };
 
@@ -659,7 +714,7 @@ app.post("/api/review-model/upload", upload.single("model"), async (req, res) =>
   res.status(201).json({
     name: normalizeUploadedName(file.originalname),
     size: file.size,
-    url: `/uploads/models/${file.filename}`,
+    url: await storeUploadedFile(file, "models"),
     uploadedAt: new Date().toISOString()
   });
 });
@@ -716,6 +771,15 @@ app.get("/api/client-links/:token", async (req, res) => {
   }
 
   res.json(createClientLinkResponse(link));
+});
+
+app.use((error, _req, res, next) => {
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
+
+  res.status(error.statusCode || 500).json({ error: error.message || "Server error" });
 });
 
 if (!isVercel && existsSync(distPath)) {

@@ -595,8 +595,8 @@ export function ModelPage() {
     try {
       setModel(await uploadModel(file));
       setStatus("Модель загружена.");
-    } catch {
-      setStatus("Не удалось загрузить GLB/GLTF.");
+    } catch (error) {
+      setStatus(error.message || "Не удалось загрузить GLB/GLTF.");
     }
   }
 

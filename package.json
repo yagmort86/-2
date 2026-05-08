@@ -20,6 +20,7 @@
     "@refinedev/core": "^5.0.12",
     "@refinedev/mui": "^8.0.2",
     "@refinedev/react-router": "^2.0.4",
+    "@vercel/blob": "^2.3.3",
     "express": "^5.2.1",
     "gsap": "latest",
     "lucide-react": "latest",
