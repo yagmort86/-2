@@ -23,7 +23,7 @@ const adminUsername = "admin";
 const adminPassword = "555837";
 const adminSecret = process.env.ADMIN_SECRET || "chaika-admin-local-secret";
 const sketchupApiKey = process.env.SKETCHUP_API_KEY || adminSecret;
-const telegramBotUsername = process.env.TELEGRAM_BOT_USERNAME || "";
+const telegramBotUsername = process.env.TELEGRAM_BOT_USERNAME || "chaikalestnica_bot";
 
 const defaultModelSettings = {
   cameraAngle: "axon",
