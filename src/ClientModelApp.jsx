@@ -61,15 +61,29 @@ function getPathToken() {
   return match ? decodeURIComponent(match[1]) : "";
 }
 
+function getLaunchParams() {
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+
+  return {
+    startParam:
+      searchParams.get("tgWebAppStartParam") ||
+      hashParams.get("tgWebAppStartParam") ||
+      searchParams.get("startapp") ||
+      hashParams.get("startapp") ||
+      searchParams.get("token") ||
+      hashParams.get("token") ||
+      ""
+  };
+}
+
 function getStartToken() {
-  const params = new URLSearchParams(window.location.search);
   const telegramApp = getTelegramApp();
+  const { startParam } = getLaunchParams();
 
   return (
     telegramApp?.initDataUnsafe?.start_param ||
-    params.get("tgWebAppStartParam") ||
-    params.get("startapp") ||
-    params.get("token") ||
+    startParam ||
     getPathToken()
   );
 }
@@ -176,7 +190,7 @@ function ViewerPage({ link, mode }) {
 
 export default function ClientModelApp() {
   const mode = useMemo(getMode, []);
-  const token = useMemo(getStartToken, []);
+  const [token, setToken] = useState(getStartToken);
   const [link, setLink] = useState(null);
   const [status, setStatus] = useState(token ? "loading" : "missing");
 
@@ -189,14 +203,17 @@ export default function ClientModelApp() {
       const telegramApp = getTelegramApp();
       telegramApp?.ready?.();
       telegramApp?.expand?.();
+      setToken(getStartToken());
     });
   }, [mode]);
 
   useEffect(() => {
     if (!token) {
+      setStatus("missing");
       return;
     }
 
+    setStatus("loading");
     fetch(`/api/client-links/${encodeURIComponent(token)}`)
       .then((response) => {
         if (!response.ok) {
