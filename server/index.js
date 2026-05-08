@@ -23,7 +23,7 @@ const adminUsername = "admin";
 const adminPassword = "555837";
 const adminSecret = process.env.ADMIN_SECRET || "chaika-admin-local-secret";
 const sketchupApiKey = process.env.SKETCHUP_API_KEY || adminSecret;
-const telegramBotUsername = process.env.TELEGRAM_BOT_USERNAME || "YourBot";
+const telegramBotUsername = process.env.TELEGRAM_BOT_USERNAME || "";
 
 const defaultModelSettings = {
   cameraAngle: "axon",
@@ -252,7 +252,9 @@ function createClientLinkResponse(link) {
     ...link,
     publicPath: `/client/${link.token}`,
     browserPath: `/viewer/${link.token}`,
-    telegramUrl: `https://t.me/${telegramBotUsername}?startapp=${encodeURIComponent(link.token)}`
+    telegramUrl: telegramBotUsername
+      ? `https://t.me/${telegramBotUsername}?startapp=${encodeURIComponent(link.token)}`
+      : `/tg?startapp=${encodeURIComponent(link.token)}`
   };
 }
 

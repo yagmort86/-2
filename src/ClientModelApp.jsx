@@ -45,11 +45,11 @@ function loadTelegramScript() {
 }
 
 function getMode() {
-  if (window.location.pathname.startsWith("/client/")) {
+  if (window.location.pathname === "/client" || window.location.pathname.startsWith("/client/")) {
     return "choice";
   }
 
-  if (window.location.pathname.startsWith("/viewer/")) {
+  if (window.location.pathname === "/viewer" || window.location.pathname.startsWith("/viewer/")) {
     return "browser";
   }
 
@@ -90,6 +90,31 @@ function getStartToken() {
 
 function buildAbsolutePath(path) {
   return new URL(path, window.location.origin).href;
+}
+
+async function getActiveModelLink() {
+  const response = await fetch("/api/model");
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const model = await response.json();
+  const activeFile = model.activeFile;
+
+  if (!activeFile?.url) {
+    return null;
+  }
+
+  return {
+    token: "",
+    title: activeFile.name || "3D модель",
+    modelUrl: activeFile.url,
+    productId: null,
+    publicPath: "/client",
+    browserPath: "/viewer",
+    telegramUrl: "/tg"
+  };
 }
 
 function ClientModelFallback({ text }) {
@@ -208,25 +233,47 @@ export default function ClientModelApp() {
   }, [mode]);
 
   useEffect(() => {
-    if (!token) {
-      setStatus("missing");
-      return;
-    }
-
+    let cancelled = false;
     setStatus("loading");
-    fetch(`/api/client-links/${encodeURIComponent(token)}`)
-      .then((response) => {
-        if (!response.ok) {
+
+    async function loadLink() {
+      try {
+        let data = null;
+
+        if (token) {
+          const response = await fetch(`/api/client-links/${encodeURIComponent(token)}`);
+
+          if (response.ok) {
+            data = await response.json();
+          }
+        }
+
+        if (!data) {
+          data = await getActiveModelLink();
+        }
+
+        if (!data) {
           throw new Error("not-found");
         }
 
-        return response.json();
-      })
-      .then((data) => {
+        if (cancelled) {
+          return;
+        }
+
         setLink(data);
         setStatus("ready");
-      })
-      .catch(() => setStatus("error"));
+      } catch {
+        if (!cancelled) {
+          setStatus(token ? "error" : "missing");
+        }
+      }
+    }
+
+    loadLink();
+
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   if (status === "missing") {

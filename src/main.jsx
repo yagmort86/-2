@@ -11,7 +11,14 @@ function RootApp() {
 
   if (path.startsWith("/admin")) {
     App = AdminApp;
-  } else if (path.startsWith("/client/") || path.startsWith("/viewer/") || path.startsWith("/tg") || path.startsWith("/telegram")) {
+  } else if (
+    path === "/client" ||
+    path.startsWith("/client/") ||
+    path === "/viewer" ||
+    path.startsWith("/viewer/") ||
+    path.startsWith("/tg") ||
+    path.startsWith("/telegram")
+  ) {
     App = ClientModelApp;
   }
 
