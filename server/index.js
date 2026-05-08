@@ -313,7 +313,8 @@ async function sendTelegramLead(text) {
   });
 
   if (!response.ok) {
-    throw new Error("Telegram notification failed");
+    const errorText = await response.text().catch(() => "");
+    throw new Error(`Telegram notification failed: ${response.status} ${errorText.slice(0, 180)}`);
   }
 
   return true;
@@ -455,6 +456,12 @@ app.post("/api/leads", async (req, res) => {
   const sent = results.filter((result) => result.status === "fulfilled" && result.value).length;
 
   if (!sent) {
+    console.error(
+      "Lead notification failed",
+      results
+        .filter((result) => result.status === "rejected")
+        .map((result) => result.reason?.message || "unknown")
+    );
     res.status(503).json({ error: "Lead notifications are not configured" });
     return;
   }
