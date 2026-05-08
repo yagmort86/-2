@@ -620,7 +620,10 @@ export function ModelPage() {
         title: clientTitle || model.activeFile.name,
         modelUrl: model.activeFile.url
       });
-      setClientLink(`${window.location.origin}${link.publicPath}`);
+      setClientLink({
+        choice: `${window.location.origin}${link.publicPath}`,
+        browser: `${window.location.origin}${link.browserPath}`
+      });
       setStatus("Ссылка для клиента создана.");
     } catch (error) {
       setStatus(
@@ -667,12 +670,22 @@ export function ModelPage() {
               Создать ссылку выбора
             </Button>
             {clientLink ? (
-              <Button variant="text" onClick={() => navigator.clipboard?.writeText(clientLink)}>
-                Скопировать
+              <Button variant="text" onClick={() => navigator.clipboard?.writeText(clientLink.choice)}>
+                Скопировать выбор
               </Button>
             ) : null}
           </Stack>
-          {clientLink ? <Typography variant="body2">{clientLink}</Typography> : null}
+          {clientLink ? (
+            <Stack spacing={0.75}>
+              <Typography variant="body2">Выбор: {clientLink.choice}</Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Typography variant="body2">Браузер: {clientLink.browser}</Typography>
+                <Button size="small" variant="text" onClick={() => navigator.clipboard?.writeText(clientLink.browser)}>
+                  Скопировать
+                </Button>
+              </Stack>
+            </Stack>
+          ) : null}
         </Stack>
         <Stack spacing={1}>
           <Typography variant="subtitle1">Ракурс</Typography>
