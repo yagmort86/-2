@@ -29,7 +29,6 @@ const telegramChatId = process.env.TELEGRAM_CHAT_ID || "";
 const maxBotToken = process.env.MAX_BOT_TOKEN || "";
 const maxUserId = process.env.MAX_USER_ID || "";
 const maxChatId = process.env.MAX_CHAT_ID || "";
-const leadTargetPhone = process.env.LEAD_TARGET_PHONE || "+79042705837";
 
 const defaultModelSettings = {
   cameraAngle: "axon",
@@ -290,7 +289,6 @@ function formatLeadMessage(lead) {
     lead.productModel ? `Модель: ${lead.productModel}` : "",
     lead.woodType ? `Древесина: ${lead.woodType}` : "",
     lead.message ? `Комментарий: ${lead.message}` : "",
-    `Получатель MAX: ${leadTargetPhone}`,
     lead.page ? `Страница: ${lead.page}` : ""
   ].filter(Boolean).join("\n");
 }
