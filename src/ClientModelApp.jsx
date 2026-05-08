@@ -93,7 +93,7 @@ function buildAbsolutePath(path) {
 }
 
 async function getActiveModelLink() {
-  const response = await fetch("/api/model");
+  const response = await fetch("/api/client-model");
 
   if (!response.ok) {
     return null;
