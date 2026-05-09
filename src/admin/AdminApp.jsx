@@ -10,6 +10,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router";
 import CssBaseline from "@mui/material/CssBaseline";
 import GlobalStyles from "@mui/material/GlobalStyles";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
+import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import NewspaperOutlinedIcon from "@mui/icons-material/NewspaperOutlined";
@@ -89,6 +90,15 @@ const resources = [
     meta: {
       label: "Товары",
       icon: <Inventory2OutlinedIcon />
+    }
+  },
+  {
+    name: "leads",
+    list: "/leads",
+    show: "/leads/show/:id",
+    meta: {
+      label: "Заявки",
+      icon: <AssignmentOutlinedIcon />
     }
   },
   {
@@ -193,6 +203,10 @@ export default function AdminApp() {
                 }
               >
                 <Route index element={<NavigateToResource resource="products" />} />
+                <Route path="leads">
+                  <Route index element={<ResourceList resource="leads" />} />
+                  <Route path="show/:id" element={<ResourceShow resource="leads" />} />
+                </Route>
                 {["products", "blog", "news", "other-products"].map((resource) => (
                   <Route path={resource} key={resource}>
                     <Route index element={<ResourceList resource={resource} />} />

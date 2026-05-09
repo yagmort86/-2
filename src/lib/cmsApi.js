@@ -20,6 +20,13 @@ export function getContent() {
 }
 
 export function createLead(lead) {
+  if (lead instanceof FormData) {
+    return request("/api/leads", {
+      method: "POST",
+      body: lead
+    });
+  }
+
   return request("/api/leads", {
     method: "POST",
     headers: {

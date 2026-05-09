@@ -2064,7 +2064,7 @@ img {
 
 .contact-options {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -2085,6 +2085,31 @@ img {
 .contact-options input {
   width: auto;
   accent-color: var(--bronze);
+}
+
+.lead-file-field small,
+.lead-file-list {
+  color: rgba(16, 23, 34, 0.62);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.lead-file-button {
+  position: relative;
+  width: fit-content;
+  min-height: 44px;
+  overflow: hidden;
+}
+
+.lead-file-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.lead-file-list {
+  overflow-wrap: anywhere;
 }
 
 .form-note,

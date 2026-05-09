@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { ArrowRight, ArrowUp, Check, Mail, MapPin, Menu, MessageCircle, Ruler, ShieldCheck, Upload, X } from "lucide-react";
+import { ArrowRight, ArrowUp, Check, Mail, MapPin, Menu, MessageCircle, Paperclip, Ruler, ShieldCheck, Upload, X } from "lucide-react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
@@ -106,6 +106,87 @@ function formatFileSize(size) {
   }
 
   return `${(size / 1024 / 1024).toFixed(1)} МБ`;
+}
+
+function formatPhoneInput(value) {
+  const raw = value.trim();
+
+  if (!raw || raw.startsWith("@") || raw.includes("@") || /[a-zA-Zа-яА-Я]/.test(raw)) {
+    return value;
+  }
+
+  let digits = raw.replace(/\D/g, "");
+
+  if (!digits) {
+    return value;
+  }
+
+  if (digits.startsWith("8")) {
+    digits = `7${digits.slice(1)}`;
+  }
+
+  if (!digits.startsWith("7")) {
+    digits = `7${digits}`;
+  }
+
+  const body = digits.slice(1, 11);
+  const parts = [
+    body.slice(0, 3),
+    body.slice(3, 6),
+    body.slice(6, 8),
+    body.slice(8, 10)
+  ];
+
+  let phone = "+7";
+
+  if (parts[0]) {
+    phone += ` (${parts[0]}`;
+  }
+
+  if (parts[0]?.length === 3) {
+    phone += ")";
+  }
+
+  if (parts[1]) {
+    phone += ` ${parts[1]}`;
+  }
+
+  if (parts[2]) {
+    phone += `-${parts[2]}`;
+  }
+
+  if (parts[3]) {
+    phone += `-${parts[3]}`;
+  }
+
+  return phone;
+}
+
+function validateContact(method, contact) {
+  const value = contact.trim();
+  const digits = value.replace(/\D/g, "");
+  const isPhone = /^\+7\s?\(?\d{3}\)?\s?\d{3}[-\s]?\d{2}[-\s]?\d{2}$/.test(value) && digits.length === 11;
+  const isUsername = /^@[a-zA-Z0-9_]{5,32}$/.test(value);
+  const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  const isChatId = /^-?\d{5,20}$/.test(value);
+
+  if (method === "phone") {
+    return isPhone;
+  }
+
+  if (method === "telegram") {
+    return isUsername || isChatId;
+  }
+
+  if (method === "email") {
+    return isEmail;
+  }
+
+  if (method === "max") {
+    return isPhone || isChatId || isUsername;
+  }
+
+  return isPhone || isUsername || isEmail || isChatId;
 }
 
 function decodeUploadedName(name) {
@@ -228,6 +309,9 @@ function LeadForm({ requestContext }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [contactMethod, setContactMethod] = useState("phone");
+  const [contact, setContact] = useState("");
+  const [attachedFiles, setAttachedFiles] = useState([]);
 
   useEffect(() => {
     if (!requestContext) {
@@ -249,24 +333,44 @@ function LeadForm({ requestContext }) {
     setError("");
 
     try {
-      await createLead({
-        name: formData.get("name"),
-        region: formData.get("region"),
-        contactMethod: formData.get("contactMethod"),
-        contact: formData.get("contact"),
-        message: formData.get("message"),
-        productModel: formData.get("productModel"),
-        woodType: formData.get("woodType"),
-        page: window.location.href
-      });
+      if (!validateContact(contactMethod, contact)) {
+        throw new Error("invalid-contact");
+      }
+
+      formData.set("contactMethod", contactMethod);
+      formData.set("contact", contact);
+      formData.set("page", window.location.href);
+
+      await createLead(formData);
       setSubmitted(true);
       form.reset();
       setMessage("");
+      setContact("");
+      setContactMethod("phone");
+      setAttachedFiles([]);
     } catch {
-      setError("Не удалось отправить заявку. Напишите в Telegram или MAX.");
+      setError("Проверьте контакт: телефон должен быть в формате +7, Telegram username начинаться с @, email должен быть корректным.");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function handleContactChange(event) {
+    const value = event.target.value;
+    setContact(contactMethod === "phone" ? formatPhoneInput(value) : value);
+  }
+
+  function handleContactMethodChange(event) {
+    const nextMethod = event.target.value;
+    setContactMethod(nextMethod);
+
+    if (nextMethod === "phone") {
+      setContact((current) => formatPhoneInput(current));
+    }
+  }
+
+  function handleFilesChange(event) {
+    setAttachedFiles(Array.from(event.target.files || []));
   }
 
   return (
@@ -299,17 +403,22 @@ function LeadForm({ requestContext }) {
         <legend>Куда отправить расчет</legend>
         <div className="contact-options">
           <label>
-            <input type="radio" name="contactMethod" value="max" defaultChecked />
+            <input type="radio" name="contactMethod" value="phone" checked={contactMethod === "phone"} onChange={handleContactMethodChange} />
+            <MessageCircle size={18} />
+            Телефон
+          </label>
+          <label>
+            <input type="radio" name="contactMethod" value="max" checked={contactMethod === "max"} onChange={handleContactMethodChange} />
             <MessageCircle size={18} />
             MAX
           </label>
           <label>
-            <input type="radio" name="contactMethod" value="telegram" />
+            <input type="radio" name="contactMethod" value="telegram" checked={contactMethod === "telegram"} onChange={handleContactMethodChange} />
             <MessageCircle size={18} />
             Telegram
           </label>
           <label>
-            <input type="radio" name="contactMethod" value="email" />
+            <input type="radio" name="contactMethod" value="email" checked={contactMethod === "email"} onChange={handleContactMethodChange} />
             <Mail size={18} />
             Почта
           </label>
@@ -318,11 +427,19 @@ function LeadForm({ requestContext }) {
 
       <label>
         Контакт
-        <input name="contact" type="text" placeholder="ID в MAX, @username или email" required />
+        <input
+          name="contact"
+          type="text"
+          placeholder="Телефон +7, @username, chat id или email"
+          value={contact}
+          onChange={handleContactChange}
+          autoComplete="tel"
+          required
+        />
       </label>
 
       <label>
-        Что уже есть
+        Напишите комментарий
         <textarea
           name="message"
           placeholder="Фото проема, размеры, план дома, этап ремонта"
@@ -330,6 +447,27 @@ function LeadForm({ requestContext }) {
           value={message}
           onChange={(event) => setMessage(event.target.value)}
         />
+      </label>
+
+      <label className="lead-file-field">
+        <span>Файлы</span>
+        <span className="button secondary lead-file-button">
+          <Paperclip size={17} />
+          Приложить файл
+          <input
+            name="files"
+            type="file"
+            accept="image/*,.pdf,.dwg,.dxf,.skp,.step,.stp,.ifc,.doc,.docx,.xls,.xlsx,.zip,.rar"
+            multiple
+            onChange={handleFilesChange}
+          />
+        </span>
+        <small>Можно приложить фото проема, PDF, чертежи, планы, замеры и другие материалы.</small>
+        {attachedFiles.length ? (
+          <span className="lead-file-list">
+            {attachedFiles.map((file) => file.name).join(", ")}
+          </span>
+        ) : null}
       </label>
 
       <button className="button primary" type="submit" disabled={submitting}>

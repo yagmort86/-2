@@ -2,6 +2,7 @@ const TOKEN_KEY = "chaika-admin-token";
 
 const resourcePaths = {
   products: "products",
+  leads: "leads",
   blog: "blog",
   news: "news",
   "other-products": "other-products"

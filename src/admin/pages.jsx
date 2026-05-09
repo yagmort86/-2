@@ -36,6 +36,7 @@ import {
 
 const resourceTitles = {
   products: "Товары",
+  leads: "Заявки",
   blog: "Блог",
   news: "Новости",
   "other-products": "Другие изделия"
@@ -84,6 +85,7 @@ const cameraAngles = [
 
 const adminNavItems = [
   { to: "/products", label: "Товары" },
+  { to: "/leads", label: "Заявки" },
   { to: "/blog", label: "Блог" },
   { to: "/news", label: "Новости" },
   { to: "/other-products", label: "Другие" },
@@ -211,7 +213,7 @@ function ActionsCell({ resource, id }) {
   return (
     <Stack direction="row" spacing={1}>
       <ShowButton hideText size="small" resource={resource} recordItemId={id} />
-      <EditButton hideText size="small" resource={resource} recordItemId={id} />
+      {resource === "leads" ? null : <EditButton hideText size="small" resource={resource} recordItemId={id} />}
       <DeleteButton hideText size="small" resource={resource} recordItemId={id} />
     </Stack>
   );
@@ -237,6 +239,14 @@ function tagsCell(params) {
   );
 }
 
+function formatAdminDate(value) {
+  if (!value) {
+    return "";
+  }
+
+  return new Date(value).toLocaleString("ru-RU");
+}
+
 function getColumns(resource) {
   const actions = {
     field: "actions",
@@ -246,6 +256,19 @@ function getColumns(resource) {
     width: 132,
     renderCell: (params) => <ActionsCell resource={resource} id={params.id} />
   };
+
+  if (resource === "leads") {
+    return [
+      { field: "createdAt", headerName: "Дата", width: 170, renderCell: (params) => formatAdminDate(params.value) },
+      { field: "name", headerName: "Имя", flex: 1, minWidth: 160 },
+      { field: "contact", headerName: "Контакт", flex: 1, minWidth: 190 },
+      { field: "contactMethod", headerName: "Связь", width: 130 },
+      { field: "region", headerName: "Регион", flex: 1, minWidth: 160 },
+      { field: "message", headerName: "Комментарий", flex: 1, minWidth: 260 },
+      { field: "files", headerName: "Файлы", width: 110, sortable: false, renderCell: (params) => (params.value?.length ? params.value.length : "нет") },
+      actions
+    ];
+  }
 
   if (resource === "products") {
     return [
@@ -296,7 +319,7 @@ export function ResourceList({ resource }) {
   return (
     <List
       title={resourceTitles[resource]}
-      headerButtons={() => <CreateButton resource={resource}>Добавить</CreateButton>}
+      headerButtons={() => (resource === "leads" ? null : <CreateButton resource={resource}>Добавить</CreateButton>)}
     >
       <DataGrid
         {...dataGridProps}
@@ -487,6 +510,30 @@ export function ResourceForm({ resource, mode }) {
   );
 }
 
+function ShowValue({ name, value }) {
+  if (name === "files" && Array.isArray(value)) {
+    if (!value.length) {
+      return <Typography>нет</Typography>;
+    }
+
+    return (
+      <Stack spacing={1} sx={{ mt: 1 }}>
+        {value.map((file) => (
+          <Button key={file.url} href={file.url} target="_blank" rel="noreferrer" variant="outlined" size="small">
+            {file.name}
+          </Button>
+        ))}
+      </Stack>
+    );
+  }
+
+  return (
+    <Typography component="pre">
+      {Array.isArray(value) || typeof value === "object" ? JSON.stringify(value, null, 2) : String(value ?? "")}
+    </Typography>
+  );
+}
+
 export function ResourceShow({ resource }) {
   const { id } = useParams();
   const { query } = useShow({ resource, id });
@@ -505,17 +552,19 @@ export function ResourceShow({ resource }) {
   return (
     <Paper className="admin-show-panel" variant="outlined">
       <Stack spacing={2}>
-        <Typography variant="h5">{record.title}</Typography>
+        <Typography variant="h5">{record.title || record.name || record.id}</Typography>
         {Object.entries(record).map(([key, value]) => (
           <Box className="admin-show-row" key={key}>
             <Typography variant="caption">{key}</Typography>
-            <Typography component="pre">{Array.isArray(value) || typeof value === "object" ? JSON.stringify(value, null, 2) : String(value ?? "")}</Typography>
+            <ShowValue name={key} value={value} />
           </Box>
         ))}
         <Stack direction="row" spacing={1.5}>
-          <Button variant="contained" onClick={() => navigate(`/${resource}/edit/${record.id}`)}>
-            Редактировать
-          </Button>
+          {resource === "leads" ? null : (
+            <Button variant="contained" onClick={() => navigate(`/${resource}/edit/${record.id}`)}>
+              Редактировать
+            </Button>
+          )}
           <Button
             variant="outlined"
             color="error"

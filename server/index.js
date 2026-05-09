@@ -14,6 +14,7 @@ const dataDir = path.join(projectRoot, "data");
 const uploadDir = path.join(dataDir, "uploads");
 const modelUploadDir = path.join(uploadDir, "models");
 const productImageDir = path.join(uploadDir, "products");
+const leadUploadDir = path.join(uploadDir, "leads");
 const contentFile = path.join(dataDir, "content.json");
 const distPath = path.join(projectRoot, "dist");
 const port = Number(process.env.PORT || 3001);
@@ -74,7 +75,8 @@ const defaultContent = {
   clientModel: {
     activeFile: null
   },
-  clientLinks: []
+  clientLinks: [],
+  leads: []
 };
 
 async function ensureStorage() {
@@ -84,6 +86,7 @@ async function ensureStorage() {
 
   await fs.mkdir(modelUploadDir, { recursive: true });
   await fs.mkdir(productImageDir, { recursive: true });
+  await fs.mkdir(leadUploadDir, { recursive: true });
 
   if (!existsSync(contentFile)) {
     await fs.writeFile(contentFile, JSON.stringify(defaultContent, null, 2), "utf8");
@@ -107,8 +110,14 @@ function mergeContent(content = {}) {
       ...defaultContent.clientModel,
       ...content.clientModel
     },
-    clientLinks: Array.isArray(content.clientLinks) ? content.clientLinks : []
+    clientLinks: Array.isArray(content.clientLinks) ? content.clientLinks : [],
+    leads: Array.isArray(content.leads) ? content.leads : []
   };
+}
+
+function toPublicContent(content) {
+  const { leads, ...publicContent } = content;
+  return publicContent;
 }
 
 function requireBlobToken() {
@@ -237,6 +246,41 @@ function cleanLeadField(value, maxLength = 1000) {
   return String(value || "").trim().slice(0, maxLength);
 }
 
+function validateLeadContact(method, contact) {
+  const value = cleanLeadField(contact, 180);
+  const digits = value.replace(/\D/g, "");
+  const isPhone = /^\+7\s?\(?\d{3}\)?\s?\d{3}[-\s]?\d{2}[-\s]?\d{2}$/.test(value) && digits.length === 11;
+  const isUsername = /^@[a-zA-Z0-9_]{5,32}$/.test(value);
+  const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  const isChatId = /^-?\d{5,20}$/.test(value);
+
+  if (method === "phone") {
+    return isPhone;
+  }
+
+  if (method === "telegram") {
+    return isUsername || isChatId;
+  }
+
+  if (method === "email") {
+    return isEmail;
+  }
+
+  if (method === "max") {
+    return isPhone || isChatId || isUsername;
+  }
+
+  return isPhone || isUsername || isEmail || isChatId;
+}
+
+function formatFileSize(size) {
+  if (!size) {
+    return "";
+  }
+
+  return `${(Number(size) / 1024 / 1024).toFixed(1)} МБ`;
+}
+
 function normalizeSpecs(value) {
   if (!Array.isArray(value)) {
     return [];
@@ -289,6 +333,9 @@ function formatLeadMessage(lead) {
     lead.productModel ? `Модель: ${lead.productModel}` : "",
     lead.woodType ? `Древесина: ${lead.woodType}` : "",
     lead.message ? `Комментарий: ${lead.message}` : "",
+    lead.files?.length
+      ? `Файлы:\n${lead.files.map((file, index) => `${index + 1}. ${file.name} ${formatFileSize(file.size)}\n${file.url}`).join("\n")}`
+      : "",
     lead.page ? `Страница: ${lead.page}` : ""
   ].filter(Boolean).join("\n");
 }
@@ -402,6 +449,46 @@ const productUpload = multer({
   }
 });
 
+const leadUpload = multer({
+  storage: isVercel
+    ? multer.memoryStorage()
+    : multer.diskStorage({
+        destination: (_req, _file, callback) => callback(null, leadUploadDir),
+        filename: (_req, file, callback) => {
+          const extension = path.extname(file.originalname).toLowerCase();
+          callback(null, `${crypto.randomUUID()}${extension}`);
+        }
+      }),
+  fileFilter: (_req, file, callback) => {
+    const extension = path.extname(file.originalname).toLowerCase();
+    const allowedExtensions = new Set([
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".webp",
+      ".heic",
+      ".pdf",
+      ".dwg",
+      ".dxf",
+      ".skp",
+      ".step",
+      ".stp",
+      ".ifc",
+      ".doc",
+      ".docx",
+      ".xls",
+      ".xlsx",
+      ".zip",
+      ".rar"
+    ]);
+    callback(null, allowedExtensions.has(extension));
+  },
+  limits: {
+    files: 8,
+    fileSize: 25 * 1024 * 1024
+  }
+});
+
 await ensureStorage();
 
 export const app = express();
@@ -426,11 +513,46 @@ app.get("/api/auth/session", requireAdmin, (_req, res) => {
 });
 
 app.get("/api/content", async (_req, res) => {
-  res.json(await readContent());
+  res.json(toPublicContent(await readContent()));
 });
 
-app.post("/api/leads", async (req, res) => {
+app.get("/api/leads", requireAdmin, async (_req, res) => {
+  const content = await readContent();
+  res.json(content.leads);
+});
+
+app.get("/api/leads/:id", requireAdmin, async (req, res) => {
+  const content = await readContent();
+  const lead = content.leads.find((item) => item.id === req.params.id);
+
+  if (!lead) {
+    res.status(404).json({ error: "Lead not found" });
+    return;
+  }
+
+  res.json(lead);
+});
+
+app.delete("/api/leads/:id", requireAdmin, async (req, res) => {
+  const content = await readContent();
+  const nextLeads = content.leads.filter((item) => item.id !== req.params.id);
+
+  if (nextLeads.length === content.leads.length) {
+    res.status(404).json({ error: "Lead not found" });
+    return;
+  }
+
+  content.leads = nextLeads;
+  await writeContent(content);
+  res.json({ id: req.params.id });
+});
+
+app.post("/api/leads", leadUpload.array("files", 8), async (req, res) => {
+  const content = await readContent();
+  const files = req.files || [];
   const lead = {
+    id: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
     name: cleanLeadField(req.body.name, 120),
     region: cleanLeadField(req.body.region, 160),
     contactMethod: cleanLeadField(req.body.contactMethod, 40),
@@ -438,13 +560,31 @@ app.post("/api/leads", async (req, res) => {
     message: cleanLeadField(req.body.message, 1800),
     productModel: cleanLeadField(req.body.productModel, 180),
     woodType: cleanLeadField(req.body.woodType, 120),
-    page: cleanLeadField(req.body.page, 300)
+    page: cleanLeadField(req.body.page, 300),
+    files: []
   };
 
   if (!lead.name || !lead.region || !lead.contact) {
     res.status(400).json({ error: "Name, region and contact are required" });
     return;
   }
+
+  if (!validateLeadContact(lead.contactMethod, lead.contact)) {
+    res.status(400).json({ error: "Invalid contact" });
+    return;
+  }
+
+  lead.files = await Promise.all(
+    files.map(async (file) => ({
+      name: normalizeUploadedName(file.originalname),
+      size: file.size,
+      type: file.mimetype,
+      url: await storeUploadedFile(file, "leads")
+    }))
+  );
+
+  content.leads.unshift(lead);
+  await writeContent(content);
 
   const text = formatLeadMessage(lead);
   const results = await Promise.allSettled([
